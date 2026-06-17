@@ -17,7 +17,7 @@ import {
   createTyped,
   deny,
   type PermissionsMap,
-} from '../../src/permissions.js';
+} from '../../src/index.js';
 
 // --- The app's domain model -------------------------------------------------
 
@@ -38,7 +38,7 @@ interface Context {
   userId?: string;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: see module comment in permissions.ts
+// biome-ignore lint/suspicious/noExplicitAny: see AppAbility doc in src/ability.ts
 type AppAbility = MongoAbility<[Action, any]>;
 
 type AppSubjectMap = {

@@ -25,8 +25,12 @@ Deferred work is tracked in [TODO.md](./TODO.md). Usage is documented in
 
 ```
 src/
-  index.ts          — public API entry point (re-exports)
-  permissions.ts    — generic, schema-agnostic CASL middleware library
+  index.ts          — public API entry point (re-exports + package overview)
+  schemaTypes.ts    — type helpers derived from generated Resolvers/ResolversTypes
+  rules.ts          — graphql-middleware rule layer (Rule, PermissionsMap, accept, deny)
+  ability.ts        — CASL Action/Actions/AppAbility/abilityOptions
+  subjects.ts       — createSubjects / createTyped
+  createCan.ts      — factory tying a CASL ability to the rule layer
 test/
   permissions.test.ts                       — unit tests for the rule primitives
   integration/

@@ -10,9 +10,9 @@ import {
   createSubjects,
   createTyped,
   deny,
-} from '../src/permissions.js';
+} from '../src/index.js';
 
-// biome-ignore lint/suspicious/noExplicitAny: see module comment in permissions.ts
+// biome-ignore lint/suspicious/noExplicitAny: see AppAbility doc in src/ability.ts
 type TestAbility = MongoAbility<[Action, any]>;
 
 interface TestContext {

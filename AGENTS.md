@@ -18,6 +18,8 @@ Deferred work is tracked in [TODO.md](./TODO.md). Usage is documented in
 - **Tests:** Vitest (`npm test`)
 - **Formatting/linting:** Biome (`npm run check`)
 - **Build:** `tsc` (`npm run build`) — outputs to `dist/`
+- **API docs:** TypeDoc + markdown plugin (`npm run docs`) — outputs to `docs/api/`
+  (generated, not committed; built and uploaded as an artifact in CI)
 - **Peer deps:** `@casl/ability >=6`, `graphql >=16`, `graphql-middleware >=6`
 - **No runtime dependencies** — everything ships as peer deps
 

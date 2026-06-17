@@ -130,7 +130,20 @@ npm run coverage # run vitest with coverage
 npm run typecheck # tsc --noEmit
 npm run build   # compile to dist/
 npm run check   # biome lint + format check
+npm run docs    # generate the Markdown API reference into docs/api/
 ```
+
+## API reference
+
+Every export carries JSDoc. Generate a full Markdown API reference with
+[TypeDoc](https://typedoc.org/) + the Markdown plugin:
+
+```bash
+npm run docs   # writes docs/api/ (git-ignored)
+```
+
+The docs are not committed; CI builds them on every push and uploads them as a
+workflow artifact.
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/) and
 drive automated releases: pushes to `main` run the **Test** workflow, and on

@@ -30,3 +30,12 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Generate API docs
+        run: npm run docs
+
+      - name: Upload API docs
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-docs
+          path: docs/api

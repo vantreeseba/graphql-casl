@@ -142,8 +142,8 @@ Every export carries JSDoc. Generate a full Markdown API reference with
 npm run docs   # writes docs/api/ (git-ignored)
 ```
 
-The docs are not committed; CI builds them on every push and uploads them as a
-workflow artifact.
+The docs are not committed; CI builds them and publishes them to this
+repository's [GitHub Wiki](../../wiki) on every push to `main`.
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/) and
 drive automated releases: pushes to `main` run the **Test** workflow, and on

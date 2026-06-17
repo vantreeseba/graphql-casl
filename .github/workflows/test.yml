@@ -46,9 +46,9 @@ jobs:
           git clone --depth 1 \
             "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki
           rm -rf wiki/*
+          # typedoc-github-wiki-theme already emits Home.md (landing page),
+          # _Sidebar.md (navigation) and wiki-compatible page names.
           cp -r docs/api/. wiki/
-          # The wiki landing page must be named Home.md.
-          if [ -f wiki/README.md ]; then mv wiki/README.md wiki/Home.md; fi
           cd wiki
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

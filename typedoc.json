@@ -1,11 +1,14 @@
 {
   "$schema": "https://typedoc.org/schema.json",
   "entryPoints": ["src/index.ts"],
-  "plugin": ["typedoc-plugin-markdown"],
+  "plugin": ["typedoc-plugin-markdown", "typedoc-github-wiki-theme"],
   "out": "docs/api",
   "readme": "none",
   "githubPages": false,
-  "flattenOutputFiles": true,
+  "sidebar": {
+    "autoConfiguration": true,
+    "heading": "API Reference"
+  },
   "hidePageHeader": true,
   "hideBreadcrumbs": true,
   "useCodeBlocks": true,

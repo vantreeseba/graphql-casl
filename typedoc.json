@@ -5,6 +5,7 @@
   "out": "docs/api",
   "readme": "none",
   "githubPages": false,
+  "flattenOutputFiles": true,
   "hidePageHeader": true,
   "hideBreadcrumbs": true,
   "useCodeBlocks": true,

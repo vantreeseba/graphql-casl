@@ -43,10 +43,7 @@ export function createSubjects<TMap extends Record<string, object>>() {
  * ```
  */
 export function createTyped<TMap extends Record<string, object>>() {
-  return function typed<K extends string & keyof TMap>(
-    type: K,
-    attrs: Record<string, unknown>,
-  ): TMap[keyof TMap] {
-    return { __typename: type, ...attrs } as unknown as TMap[keyof TMap];
+  return function typed<K extends string & keyof TMap>(type: K, attrs: Partial<TMap[K]>): TMap[K] {
+    return { __typename: type, ...attrs } as TMap[K];
   };
 }

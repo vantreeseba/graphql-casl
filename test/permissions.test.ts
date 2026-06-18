@@ -57,7 +57,7 @@ describe('createCan', () => {
   const canUser = createCan<TestContext, TestAbility>(
     async (ctx) => buildAbility(ctx.userId),
     (ctx) => ctx.userId != null,
-    typed as (type: string, attrs: Record<string, unknown>) => unknown,
+    typed,
   );
 
   it('throws when the context is not authenticated', async () => {
@@ -90,6 +90,22 @@ describe('createCan', () => {
     }));
     await expect(rule(resolve, null, { userId: 'u1' }, { userId: 'u1' }, info)).resolves.toBe(
       'updated',
+    );
+  });
+
+  it('throws if getSubjectData is used without configuring buildSubject', () => {
+    // Omitting buildSubject yields the RequireCanBare overload, which forbids
+    // getSubjectData at compile time; cast past it to exercise the runtime guard.
+    const canBare = createCan<TestContext, TestAbility>(
+      async (ctx) => buildAbility(ctx.userId),
+      (ctx) => ctx.userId != null,
+    ) as unknown as (
+      action: Action,
+      subject: string,
+      getSubjectData: (args: unknown) => Record<string, unknown>,
+    ) => unknown;
+    expect(() => canBare(Actions.update, 'Note', () => ({ userId: 'u1' }))).toThrow(
+      /requires a `buildSubject` tagger/,
     );
   });
 });

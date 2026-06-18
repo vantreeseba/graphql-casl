@@ -7,6 +7,28 @@ import type { AbilityLike, Action } from './ability.js';
 import type { Rule } from './rules.js';
 
 /**
+ * The rule builder returned by {@link createCan} when a `buildSubject` tagger is
+ * provided. Supports both bare-subject checks and condition objects derived from
+ * resolver args via `getSubjectData`.
+ *
+ * @typeParam TArgs - The resolver's args type, used to type `getSubjectData`.
+ */
+export type RequireCan = <TArgs extends Record<string, unknown> = Record<string, unknown>>(
+  action: Action,
+  subject: string,
+  getSubjectData?: (args: TArgs) => Record<string, unknown>,
+) => Rule;
+
+/**
+ * The rule builder returned by {@link createCan} when no `buildSubject` tagger is
+ * provided. Only bare-subject checks are possible: `getSubjectData` is omitted
+ * because, without a tagger, the condition object would carry no `__typename`,
+ * so CASL could not classify the subject and every conditioned check would
+ * silently fail. Pass a `buildSubject` to `createCan` to unlock conditions.
+ */
+export type RequireCanBare = (action: Action, subject: string) => Rule;
+
+/**
  * Factory that returns a `requireCan(action, subject, getSubjectData?)` rule
  * builder bound to a specific ability resolver.
  *
@@ -35,7 +57,7 @@ import type { Rule } from './rules.js';
  * const canUser = createCan<Context, AppAbility>(
  *   async (ctx) => defineAbilitiesFor(ctx.userId),
  *   (ctx) => ctx.userId != null,
- *   typed as (type: string, attrs: Record<string, unknown>) => any,
+ *   typed,
  * );
  *
  * // bare subject:
@@ -51,13 +73,37 @@ import type { Rule } from './rules.js';
 export function createCan<TContext, TAbility extends AbilityLike>(
   getAbility: (context: TContext) => Promise<TAbility>,
   isAuthenticated: (context: TContext) => boolean,
-  buildSubject?: (type: string, attrs: Record<string, unknown>) => unknown,
-) {
+  // `type` is `any` so a narrowly-typed `typed<K extends keyof TMap>` assigns here
+  // without a cast at the call site; this slot is wired once per app.
+  // biome-ignore lint/suspicious/noExplicitAny: see note above
+  buildSubject: (type: any, attrs: Record<string, unknown>) => unknown,
+): RequireCan;
+export function createCan<TContext, TAbility extends AbilityLike>(
+  getAbility: (context: TContext) => Promise<TAbility>,
+  isAuthenticated: (context: TContext) => boolean,
+): RequireCanBare;
+export function createCan<TContext, TAbility extends AbilityLike>(
+  getAbility: (context: TContext) => Promise<TAbility>,
+  isAuthenticated: (context: TContext) => boolean,
+  // biome-ignore lint/suspicious/noExplicitAny: see overload signature above
+  buildSubject?: (type: any, attrs: Record<string, unknown>) => unknown,
+): RequireCan {
   return function requireCan<TArgs extends Record<string, unknown> = Record<string, unknown>>(
     action: Action,
     subject: string,
     getSubjectData?: (args: TArgs) => Record<string, unknown>,
   ): Rule {
+    // Guards the footgun the overloads already forbid at the type level, for
+    // callers reaching this via plain JS or a cast: a condition object with no
+    // `__typename` can never be classified by CASL, so the check would silently
+    // deny every request. Fail loudly at map-construction time instead.
+    if (getSubjectData && !buildSubject) {
+      throw new Error(
+        'createCan: `getSubjectData` requires a `buildSubject` tagger (e.g. `typed` from ' +
+          '`createTyped`) to be passed to `createCan`; without it the subject has no ' +
+          '`__typename` and CASL cannot match conditions.',
+      );
+    }
     return async (resolve, parent, args, context, info) => {
       if (!isAuthenticated(context)) {
         throw new Error('Not authenticated');
@@ -66,9 +112,7 @@ export function createCan<TContext, TAbility extends AbilityLike>(
       const instance =
         getSubjectData && buildSubject
           ? buildSubject(subject, getSubjectData(args as TArgs))
-          : getSubjectData
-            ? getSubjectData(args as TArgs)
-            : subject;
+          : subject;
 
       if (!ability.can(action, instance)) {
         throw new Error('Forbidden');

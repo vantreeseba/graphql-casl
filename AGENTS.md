@@ -30,11 +30,13 @@ src/
   index.ts          — public API entry point (re-exports + package overview)
   schemaTypes.ts    — type helpers derived from generated Resolvers/ResolversTypes
   rules.ts          — graphql-middleware rule layer (Rule, PermissionsMap, accept, deny)
-  ability.ts        — CASL Action/Actions/AppAbility/abilityOptions
+  ability.ts        — CASL Action/Actions + the loose AbilityLike shape
+  graphqlAbility.ts — GraphQLAbility, createGraphQLAbility, buildGraphQLAbility, gqlConditionsMatcher
   subjects.ts       — createSubjects / createTyped
   createCan.ts      — factory tying a CASL ability to the rule layer
 test/
   permissions.test.ts                       — unit tests for the rule primitives
+  graphqlAbility.test.ts                     — typed ability: conditions, operators, stored-rule rehydration
   example.test.ts                            — runnable "todos" worked example / reference docs
   example.codegen.ts                         — trimmed `graphql-codegen` output the example consumes
   integration/
@@ -48,8 +50,15 @@ vitest.config.ts    — dedupes/inlines graphql so it loads as a single instance
 - The library is **schema-agnostic**: type helpers (`SubjectName`, `SubjectMap`,
   `ArgsOf`, `ParentOf`, `ContextOf`) are derived from the consumer's generated
   `Resolvers` / `ResolversTypes` — never hardcode domain type names in the library
-- Runtime subject detection uses `__typename` via `abilityOptions.detectSubjectType`,
-  so consumers tag plain objects with `createTyped()` rather than CASL's `subject()`
+- Subjects are detected by `__typename`: `createTyped()` tags objects with a required,
+  narrowed `__typename`, which CASL's `TaggedInterface` natively accepts (so no
+  `__caslSubjectType__` is used)
+- `GraphQLAbility<SubjectMap>` is built on CASL's pure `Ability` base (not `MongoAbility`)
+  with `gqlConditionsMatcher` (equality + `eq/ne/in/nin/gt/gte/lt/lte`, all serializable);
+  `createGraphQLAbility` gives statically-typed `can`/`cannot` conditions via a `__typename`-tagged
+  subject tuple + a CASL HKT on the conditions type. There is no untyped ability path
+- Rules are plain JSON: persist `builder.rules` / `ability.rules` and rehydrate with
+  `buildGraphQLAbility(rules)` (for DB-backed, cached-at-startup authorization)
 - `createCan` / `createSubjects` / `createTyped` are factories bound to the
   consumer's context shape and ability builder — keep auth/ability logic out of
   the library core

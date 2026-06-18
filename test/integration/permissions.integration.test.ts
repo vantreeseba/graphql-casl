@@ -3,19 +3,18 @@
  * real executable schema and run queries/mutations as different callers.
  */
 
-import { AbilityBuilder, createMongoAbility, type MongoAbility } from '@casl/ability';
 import { makeExecutableSchema } from '@graphql-tools/schema';
 import { type GraphQLSchema, graphql } from 'graphql';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
-  type Action,
   Actions,
-  abilityOptions,
   accept,
   applyPermissions,
   createCan,
+  createGraphQLAbility,
   createTyped,
   deny,
+  type GraphQLAbility,
   type PermissionsMap,
 } from '../../src/index.js';
 
@@ -41,27 +40,23 @@ interface Context {
   userId?: string;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: see AppAbility doc in src/ability.ts
-type AppAbility = MongoAbility<[Action, any]>;
-
 type AppSubjectMap = {
   User: { id: string };
   Note: Note;
 };
 
+type AppAbility = GraphQLAbility<AppSubjectMap>;
+
 const typed = createTyped<AppSubjectMap>();
 
 function defineAbilitiesFor(userId: string | undefined): AppAbility {
-  const { can, cannot, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
-  if (!userId) {
-    cannot(Actions.manage, 'all');
-    return build(abilityOptions);
-  }
+  const { can, build } = createGraphQLAbility<AppSubjectMap>();
+  if (!userId) return build();
   can(Actions.read, 'User');
   can(Actions.read, 'Note');
   // Callers may only update their own notes.
   can(Actions.update, 'Note', { userId });
-  return build(abilityOptions);
+  return build();
 }
 
 const canUser = createCan<Context, AppAbility>(

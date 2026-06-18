@@ -15,20 +15,19 @@
  * from them with `SubjectMap`, so nothing about the domain is hand-listed here.
  */
 
-import { AbilityBuilder, createMongoAbility, type MongoAbility } from '@casl/ability';
 import { makeExecutableSchema } from '@graphql-tools/schema';
 import { type GraphQLSchema, graphql } from 'graphql';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  type Action,
   Actions,
-  abilityOptions,
   accept,
   applyPermissions,
   createCan,
+  createGraphQLAbility,
   createSubjects,
   createTyped,
   deny,
+  type GraphQLAbility,
   type PermissionsMap,
   type SubjectMap,
 } from '../src/index.js';
@@ -52,28 +51,25 @@ let TODOS: Todo[];
 
 // 2. The per-request CASL ability --------------------------------------------
 
-// The `any` subject is intentional — see the AppAbility doc in src/ability.ts.
-// biome-ignore lint/suspicious/noExplicitAny: subject conditions are matched at runtime
-type AppAbility = MongoAbility<[Action, any]>;
-
-function defineAbilitiesFor(userId: string | undefined): AppAbility {
-  const { can, cannot, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
-  if (!userId) {
-    cannot(Actions.manage, 'all'); // anonymous callers can do nothing
-    return build(abilityOptions);
-  }
-  can(Actions.read, 'Todo'); // read any todo
-  can(Actions.create, 'Todo'); // create todos
-  can(Actions.update, 'Todo', { ownerId: userId }); // but only update your own
-  return build(abilityOptions);
-}
-
-// 3. Subjects: a typed tagger + a const of subject names ---------------------
-
 // `SubjectMap` derives the subject types straight from the generated
 // `Resolvers` / `ResolversTypes`: it drops root operations (Query/Mutation) and
 // scalars, leaving `{ Todo: Partial<Todo> }` here — no manual type listing.
 type AppSubjectMap = SubjectMap<Resolvers, ResolversTypes>;
+
+// A schema-typed ability: `can`/`cannot` conditions are checked against the
+// subject's fields, and `build()` wires `__typename` detection + the matcher.
+type AppAbility = GraphQLAbility<AppSubjectMap>;
+
+function defineAbilitiesFor(userId: string | undefined): AppAbility {
+  const { can, build } = createGraphQLAbility<AppSubjectMap>();
+  if (!userId) return build(); // no rules ⇒ anonymous callers can do nothing
+  can(Actions.read, 'Todo'); // read any todo
+  can(Actions.create, 'Todo'); // create todos
+  can(Actions.update, 'Todo', { ownerId: userId }); // but only update your own
+  return build();
+}
+
+// 3. Subjects: a typed tagger + a const of subject names ---------------------
 
 // `typed` tags plain objects with __typename so CASL can classify them at
 // runtime; `Subject` gives autocompleted, typo-proof subject-name literals.

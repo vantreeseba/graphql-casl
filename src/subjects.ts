@@ -32,8 +32,10 @@ export function createSubjects<TMap extends Record<string, object>>() {
 /**
  * Returns a `typed(type, attrs)` helper bound to a specific subject map.
  *
- * Call once at the app level to tag plain objects with `__typename` so CASL's
- * `detectSubjectType` (see `abilityOptions`) can resolve them at runtime.
+ * Call once at the app level to tag plain objects with a required `__typename`
+ * so CASL can classify them — both at runtime (`detectSubjectType`) and at the
+ * type level, where the narrowed `__typename` makes the object satisfy a typed
+ * `GraphQLAbility`'s `can`/`cannot` subject parameter.
  *
  * @typeParam TMap - The subject map, e.g. `SubjectMap<Resolvers, ResolversTypes>`.
  * @example
@@ -43,7 +45,10 @@ export function createSubjects<TMap extends Record<string, object>>() {
  * ```
  */
 export function createTyped<TMap extends Record<string, object>>() {
-  return function typed<K extends string & keyof TMap>(type: K, attrs: Partial<TMap[K]>): TMap[K] {
-    return { __typename: type, ...attrs } as TMap[K];
+  return function typed<K extends string & keyof TMap>(
+    type: K,
+    attrs: Partial<TMap[K]>,
+  ): TMap[K] & { __typename: K } {
+    return { __typename: type, ...attrs } as unknown as TMap[K] & { __typename: K };
   };
 }

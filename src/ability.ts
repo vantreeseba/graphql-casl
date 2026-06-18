@@ -1,9 +1,9 @@
 /**
- * CASL-specific pieces: the {@link Action} verbs, the {@link AppAbility} shape,
- * and the {@link abilityOptions} that wire `__typename`-based subject detection.
+ * CASL action verbs and the minimal ability shape the rule layer depends on.
+ *
+ * The concrete typed ability lives in `./graphqlAbility.js`
+ * ({@link GraphQLAbility} / {@link createGraphQLAbility}).
  */
-
-import type { MongoAbility } from '@casl/ability';
 
 /** The CASL action verbs supported by this middleware. */
 export type Action = 'create' | 'read' | 'update' | 'delete' | 'manage';
@@ -25,25 +25,11 @@ export const Actions = {
 } as const satisfies Record<Action, Action>;
 
 /**
- * The ability shape used throughout the middleware.
- *
- * Uses `MongoAbility<[Action, any]>` because `__typename`-based runtime subject
- * detection cannot provide static condition typing without CASL's `ForcedSubject`.
+ * Minimal structural type for anything with a CASL-style `can` method. Kept
+ * deliberately loose so any concrete ability (e.g. a typed `GraphQLAbility`,
+ * whose `can` is narrowly overloaded) satisfies it.
  */
-// biome-ignore lint/suspicious/noExplicitAny: see type doc above
-export type AppAbility = MongoAbility<[Action, any]>;
-
-/** Minimal structural type for anything with a CASL-style `can` method. */
 export type AbilityLike = {
-  can(action: string, subject: unknown): boolean;
-};
-
-/**
- * CASL options to pass to `createMongoAbility` / `AbilityBuilder.build`.
- *
- * `detectSubjectType` reads `__typename`, so subjects tagged by `createTyped`
- * are resolved at runtime without CASL's `ForcedSubject`.
- */
-export const abilityOptions = {
-  detectSubjectType: (obj: Record<PropertyKey, unknown>) => obj.__typename as string,
+  // biome-ignore lint/suspicious/noExplicitAny: structural shim for any ability's can()
+  can(...args: any[]): boolean;
 };

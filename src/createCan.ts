@@ -114,7 +114,9 @@ export function createCan<TContext, TAbility extends AbilityLike>(
           ? buildSubject(subject, getSubjectData(args as TArgs))
           : subject;
 
-      if (!ability.can(action, instance)) {
+      // Cast to the loose AbilityLike shape: a typed ability's `can` is narrowly
+      // overloaded, but here `instance` is an opaque subject value or name.
+      if (!(ability as AbilityLike).can(action, instance)) {
         throw new Error('Forbidden');
       }
       return resolve(parent, args, context, info);

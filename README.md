@@ -21,40 +21,61 @@ npm install @casl/ability graphql graphql-middleware
 
 | Export | What it does |
 |---|---|
+| `createGraphQLAbility<SubjectMap>()` | Returns a CASL `AbilityBuilder` typed against your schema — `can`/`cannot` conditions are checked against each subject's fields — with the GraphQL conditions matcher and `__typename` detection applied by `build()`. |
+| `buildGraphQLAbility<SubjectMap>(rules, options?)` | Rebuilds an ability from stored `GraphQLRule`s (e.g. rules persisted in a database and loaded at startup). |
 | `createCan(getAbility, isAuthenticated, buildSubject?)` | Factory that returns a `requireCan(action, subject, getSubjectData?)` rule builder, bound to your context shape and ability builder. |
-| `createTyped<SubjectMap>()` | Returns a `typed(type, attrs)` helper that tags plain objects with `__typename` for CASL's runtime subject detection. |
+| `createTyped<SubjectMap>()` | Returns a `typed(type, attrs)` helper that tags plain objects with `__typename` for subject detection. |
 | `createSubjects<SubjectMap>()` | Validates a subject-name const object against your schema's domain types. |
+| `gqlConditionsMatcher` | The GraphQL conditions matcher (equality + a small operator set), for manual ability construction. |
 | `accept` / `deny` | Always-pass / always-fail rule primitives. |
-| `abilityOptions` | `detectSubjectType` config (reads `__typename`) to pass to `createMongoAbility`. |
 | `Actions` | Const map of `create` / `read` / `update` / `delete` / `manage`. |
 
 Type helpers: `PermissionsMap`, `Rule`, `SubjectName`, `SubjectMap`, `ArgsOf`,
-`ParentOf`, `ContextOf`, `Action`, `AppAbility`, `AbilityLike`.
+`ParentOf`, `ContextOf`, `Action`, `GraphQLAbility`, `GraphQLAbilities`,
+`GraphQLRule`, `GraphQLAbilityOptions`, `GqlConditions`, `GqlConditionsFor`,
+`GqlFieldCondition`, `GqlOperators`, `AbilityLike`.
 
 A failed authentication check throws `Not authenticated`; a failed ability check
 throws `Forbidden`.
+
+### Conditions
+
+Conditions are a small, **serializable** language (no mongo-query operators). A
+field maps to either a bare value (equality) or an operator object:
+
+```ts
+can('read', 'Note', { userId });                       // equality
+can('read', 'Note', { status: { in: ['draft', 'live'] } });
+can('read', 'Note', { version: { gt: 2 }, title: { ne: '' } });
+```
+
+Operators: `eq`, `ne`, `in`, `nin`, `gt`, `gte`, `lt`, `lte`. Because rules are
+plain JSON, you can store them in a database and rehydrate with
+`buildGraphQLAbility` (see [Persisting rules](#5-persisting-rules-optional)).
 
 ## Usage
 
 ### 1. Build abilities
 
 Bind the generic helpers to your app's generated types and define abilities with
-CASL's `AbilityBuilder`. Subjects are tagged by `__typename`, so use
-`abilityOptions` when building.
+`createGraphQLAbility`. It returns a CASL `AbilityBuilder` typed against your
+`SubjectMap`, so `can`/`cannot` conditions are checked against each subject's
+fields, and `build()` wires the GraphQL conditions matcher and `__typename`
+subject detection for you.
 
 ```ts
-import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import {
   Actions,
-  abilityOptions,
+  createGraphQLAbility,
   createSubjects,
   createTyped,
-  type AppAbility,
+  type GraphQLAbility,
   type SubjectMap,
 } from '@vantreeseba/graphql-casl';
 import type { Resolvers, ResolversTypes } from './__generated__/resolvers.js';
 
 type AppSubjectMap = SubjectMap<Resolvers, ResolversTypes>;
+export type AppAbility = GraphQLAbility<AppSubjectMap>;
 
 export const typed = createTyped<AppSubjectMap>();
 export const Subject = createSubjects<AppSubjectMap>()({
@@ -63,14 +84,11 @@ export const Subject = createSubjects<AppSubjectMap>()({
 } as const);
 
 export function defineAbilitiesFor(userId: string | undefined): AppAbility {
-  const { can, cannot, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
-  if (!userId) {
-    cannot(Actions.manage, 'all');
-    return build(abilityOptions);
-  }
+  const { can, build } = createGraphQLAbility<AppSubjectMap>();
+  if (!userId) return build(); // no rules ⇒ everything denied
   can(Actions.read, Subject.Note);
-  can(Actions.update, Subject.Note, { userId }); // condition on the subject's fields
-  return build(abilityOptions);
+  can(Actions.update, Subject.Note, { userId }); // typed against Note's fields
+  return build();
 }
 ```
 
@@ -79,7 +97,7 @@ export function defineAbilitiesFor(userId: string | undefined): AppAbility {
 ```ts
 import { createCan } from '@vantreeseba/graphql-casl';
 import type { Context } from './context.js';
-import { defineAbilitiesFor, typed } from './abilities.js';
+import { type AppAbility, defineAbilitiesFor, typed } from './abilities.js';
 
 const canUser = createCan<Context, AppAbility>(
   async (ctx) => defineAbilitiesFor(ctx.userId),
@@ -123,6 +141,25 @@ const schemaWithPermissions = applyPermissions<Resolvers>(schema, permissions);
 `applyPermissions` wraps `graphql-middleware`'s `applyMiddleware` and keeps
 `permissions` typed as a `PermissionsMap<Resolvers>`, so a mistyped type or
 field name is caught at compile time.
+
+### 5. Persisting rules (optional)
+
+Rules are plain JSON, so they can be stored in a database and loaded/cached at
+startup. Read `builder.rules` (or `ability.rules`) to persist them, and rebuild
+with `buildGraphQLAbility`:
+
+```ts
+import { buildGraphQLAbility, type GraphQLRule } from '@vantreeseba/graphql-casl';
+
+// persist
+const { can, build } = createGraphQLAbility<AppSubjectMap>();
+can(Actions.update, Subject.Note, { userId });
+await db.savePermissionRules(build().rules);
+
+// load (per request or cached)
+const rules: GraphQLRule<AppSubjectMap>[] = await db.loadPermissionRules();
+const ability = buildGraphQLAbility<AppSubjectMap>(rules);
+```
 
 ## Development
 

@@ -1,0 +1,57 @@
+accessibleBy-style query helper — plan (Workstream B)
+=====================================================
+Status: NOT STARTED. Deferred follow-up to the GraphQLAbility work
+(see graphqlability.todo.txt for that, now DONE).
+
+Motivation
+----------
+The library is GATE-ONLY today: a rule allows or denies a whole resolver/field.
+It cannot do row/list-level filtering ("return only the notes this user may
+read"). @casl/mongoose solves the equivalent for Mongoose via accessibleBy,
+which is built on rulesToQuery from '@casl/ability/extra':
+
+  - rulesToQuery(ability, action, subjectType, convert) folds matching rules into
+    a query object: DIRECT rules -> $or (permissive), INVERTED rules -> $and of
+    $not (restrictive). Returns null if the action is wholly disallowed on the
+    subject type (caller should treat as "deny all" -> []).
+  - @casl/mongoose's accessibleBy(ability).ofType('Post') returns a mongoose
+    Query you can chain (.select/.limit/.sort).
+  - Sequelize/other adapters supply their own `convert` (e.g. wrap inverted
+    conditions in $not, symbolize operators).
+
+GraphQL analog
+--------------
+Give a list/connection resolver a FILTER derived from the caller's ability
+conditions, so it fetches only accessible rows instead of post-filtering.
+
+Plan
+----
+[ ] B1. SCOPE DECISION (review w/ user): does row-level filtering belong in this
+        library (shifts it from "gate" to "gate + filter"), or in a separate
+        package? Affects public API surface and docs framing.
+
+[ ] B2. Prototype accessibleBy(ability, action, subjectName) wrapping rulesToQuery
+        from '@casl/ability/extra'. Keep `convert` SCHEMA-AGNOSTIC: return the raw
+        $and/$or condition tree and let the consumer translate it to their data
+        layer (Prisma/Drizzle/SQL/Mongo). Do NOT bake in Mongo operators.
+        null result => deny-all (resolver returns []).
+
+[ ] B3. Optional typed return: key the produced filter off
+        GraphQLAbility<TSubjectMap>[subject] so it is typed against the model's
+        fields (reuse the Tagged-subject machinery from src/graphqlAbility.ts).
+
+[ ] B4. Tests: unit (rules -> query tree for direct + inverted rules, and the
+        null/deny-all case) + an integration list resolver returning only owned
+        rows. Mirror the style of test/integration/permissions.integration.test.ts.
+
+[ ] B5. Confirm '@casl/ability/extra' is part of '@casl/ability' >=6 (it is in v7
+        here: node_modules/@casl/ability/dist/types/extra). No NEW peer dep needed,
+        but document the import path. README + AGENTS.md updates.
+
+Open questions
+--------------
+1. In-scope here vs separate package? (B1)
+2. API shape: free function `accessibleBy(ability, action, subject, convert?)`
+   vs a factory bound to TSubjectMap (matches createCan/createTyped style)?
+3. Default `convert` — return raw conditions, or provide a couple of ready-made
+   adapters (e.g. a passthrough + a $not-wrapping one) as opt-in helpers?

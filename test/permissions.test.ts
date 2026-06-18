@@ -1,23 +1,16 @@
-import { AbilityBuilder, createMongoAbility, type MongoAbility } from '@casl/ability';
 import type { GraphQLResolveInfo } from 'graphql';
 import { describe, expect, it, vi } from 'vitest';
 import {
   type Action,
   Actions,
-  abilityOptions,
   accept,
   createCan,
+  createGraphQLAbility,
   createSubjects,
   createTyped,
   deny,
+  type GraphQLAbility,
 } from '../src/index.js';
-
-// biome-ignore lint/suspicious/noExplicitAny: see AppAbility doc in src/ability.ts
-type TestAbility = MongoAbility<[Action, any]>;
-
-interface TestContext {
-  userId?: string;
-}
 
 // An example subject map — in a real app this comes from SubjectMap<Resolvers, ResolversTypes>.
 type ExampleSubjectMap = {
@@ -25,17 +18,20 @@ type ExampleSubjectMap = {
   Org: { id: string };
 };
 
+type TestAbility = GraphQLAbility<ExampleSubjectMap>;
+
+interface TestContext {
+  userId?: string;
+}
+
 const typed = createTyped<ExampleSubjectMap>();
 
 function buildAbility(userId: string | undefined): TestAbility {
-  const { can, cannot, build } = new AbilityBuilder<TestAbility>(createMongoAbility);
-  if (!userId) {
-    cannot(Actions.manage, 'all');
-    return build(abilityOptions);
-  }
+  const { can, build } = createGraphQLAbility<ExampleSubjectMap>();
+  if (!userId) return build(); // no rules ⇒ everything denied
   can(Actions.read, 'Note');
   can(Actions.update, 'Note', { userId });
-  return build(abilityOptions);
+  return build();
 }
 
 // A stand-in resolve info object — rules never read it, so an empty cast is fine.

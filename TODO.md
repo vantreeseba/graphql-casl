@@ -2,11 +2,6 @@
 
 ## Deferred from the initial version
 
-- **Static condition typing** — `AppAbility` is `MongoAbility<[Action, any]>`
-  because `__typename`-based runtime detection cannot statically type CASL
-  conditions without `ForcedSubject`. Revisit once a typed subject strategy is
-  in place.
-
 - **Ready-made ability presets** — explore optional helpers for common
   ownership patterns (e.g. `ownsField('userId')`) so consumers write less
   boilerplate in their ability builders.

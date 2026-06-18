@@ -84,8 +84,7 @@ import { defineAbilitiesFor, typed } from './abilities.js';
 const canUser = createCan<Context, AppAbility>(
   async (ctx) => defineAbilitiesFor(ctx.userId),
   (ctx) => ctx.userId != null,
-  // biome-ignore lint: typed<K> generic can't widen to (string) at the call site
-  typed as (type: string, attrs: Record<string, unknown>) => any,
+  typed,
 );
 ```
 
@@ -113,13 +112,17 @@ export const permissions: PermissionsMap<Resolvers> = {
 };
 ```
 
-### 4. Apply as middleware
+### 4. Apply to the schema
 
 ```ts
-import { applyMiddleware } from 'graphql-middleware';
+import { applyPermissions } from '@vantreeseba/graphql-casl';
 
-const schemaWithPermissions = applyMiddleware(schema, permissions);
+const schemaWithPermissions = applyPermissions<Resolvers>(schema, permissions);
 ```
+
+`applyPermissions` wraps `graphql-middleware`'s `applyMiddleware` and keeps
+`permissions` typed as a `PermissionsMap<Resolvers>`, so a mistyped type or
+field name is caught at compile time.
 
 ## Development
 

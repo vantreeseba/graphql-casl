@@ -4,8 +4,8 @@
  * primitives.
  */
 
-import type { GraphQLResolveInfo } from 'graphql';
-import type { IMiddlewareTypeMap } from 'graphql-middleware';
+import type { GraphQLResolveInfo, GraphQLSchema } from 'graphql';
+import { applyMiddleware, type IMiddlewareTypeMap } from 'graphql-middleware';
 
 type ResolveFn = (
   parent?: unknown,
@@ -49,11 +49,17 @@ export const deny: Rule = () => {
 };
 
 /**
- * The permissions map passed to `graphql-middleware`'s `applyMiddleware`.
+ * The permissions map applied to a schema via {@link applyPermissions}.
  *
- * Extends `IMiddlewareTypeMap` so it is directly assignable to `applyMiddleware`.
- * Each type key is optional and maps to either a single {@link Rule} (applied to
- * every field of the type) or a per-field map of rules.
+ * Every key is validated against your generated `Resolvers`: type names come
+ * from `keyof TResolvers` and field names from each type's resolver keys, so a
+ * mistyped or unknown type/field is a compile error. Each type key is optional
+ * and maps to either a single {@link Rule} (applied to every field of the type)
+ * or a per-field map of rules.
+ *
+ * Because the keys are validated this is structurally narrower than
+ * `graphql-middleware`'s `IMiddlewareTypeMap`; pass it through
+ * {@link applyPermissions} rather than `applyMiddleware` directly.
  *
  * @typeParam TResolvers - Your generated `Resolvers` type.
  * @example
@@ -64,10 +70,34 @@ export const deny: Rule = () => {
  * };
  * ```
  */
-export type PermissionsMap<TResolvers> = IMiddlewareTypeMap & {
+export type PermissionsMap<TResolvers> = {
   [TypeName in keyof TResolvers]?:
     | Rule
     | {
         [FieldName in keyof NonNullable<TResolvers[TypeName]>]?: Rule;
       };
 };
+
+/**
+ * Applies a {@link PermissionsMap} to an executable schema via `graphql-middleware`.
+ *
+ * Prefer this over calling `applyMiddleware` directly: `PermissionsMap` is
+ * intentionally narrower than `IMiddlewareTypeMap` so it can validate type and
+ * field names, and this helper performs the single widening cast at the boundary
+ * so consumers never have to.
+ *
+ * @typeParam TResolvers - Your generated `Resolvers` type.
+ * @param schema - The executable schema to guard.
+ * @param permissions - The permissions map to enforce.
+ * @returns The schema wrapped with the permission middleware.
+ * @example
+ * ```ts
+ * const schema = applyPermissions<Resolvers>(makeExecutableSchema({ typeDefs, resolvers }), permissions);
+ * ```
+ */
+export function applyPermissions<TResolvers>(
+  schema: GraphQLSchema,
+  permissions: PermissionsMap<TResolvers>,
+): GraphQLSchema {
+  return applyMiddleware(schema, permissions as IMiddlewareTypeMap);
+}

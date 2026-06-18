@@ -51,7 +51,7 @@ jobs:
           rm -rf wiki/*
           # typedoc-github-wiki-theme already emits Home.md (landing page),
           # _Sidebar.md (navigation) and wiki-compatible page names.
-          cp -r docs/api/. wiki/
+          cp -r packages/graphql-casl/docs/api/. wiki/
           cd wiki
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

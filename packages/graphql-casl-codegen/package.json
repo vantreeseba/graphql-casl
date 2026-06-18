@@ -1,0 +1,42 @@
+{
+  "name": "@vantreeseba/graphql-casl-codegen",
+  "version": "0.0.0",
+  "description": "GraphQL Code Generator plugin that emits @vantreeseba/graphql-casl subject bindings from your schema.",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vantreeseba/graphql-casl.git",
+    "directory": "packages/graphql-casl-codegen"
+  },
+  "homepage": "https://github.com/vantreeseba/graphql-casl#readme",
+  "bugs": {
+    "url": "https://github.com/vantreeseba/graphql-casl/issues"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc -p tsconfig.tests.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "@graphql-codegen/plugin-helpers": ">=5",
+    "graphql": ">=16"
+  },
+  "devDependencies": {
+    "@graphql-codegen/plugin-helpers": "^5.1.1",
+    "graphql": "^16.14.0"
+  }
+}

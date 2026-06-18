@@ -1,0 +1,47 @@
+{
+  "name": "@vantreeseba/graphql-casl",
+  "version": "0.2.0",
+  "description": "GraphQL middleware plugin for defining CASL permission rules on resolvers.",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vantreeseba/graphql-casl.git",
+    "directory": "packages/graphql-casl"
+  },
+  "homepage": "https://github.com/vantreeseba/graphql-casl#readme",
+  "bugs": {
+    "url": "https://github.com/vantreeseba/graphql-casl/issues"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc -p tsconfig.tests.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "docs": "typedoc"
+  },
+  "peerDependencies": {
+    "@casl/ability": ">=6",
+    "graphql": ">=16",
+    "graphql-middleware": ">=6"
+  },
+  "devDependencies": {
+    "@casl/ability": "^7.0.0",
+    "@graphql-tools/schema": "^10.0.33",
+    "graphql": "^16.14.0",
+    "graphql-middleware": "^6.1.35"
+  }
+}

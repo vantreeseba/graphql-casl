@@ -14,5 +14,18 @@ export default defineConfig({
         inline: ['graphql', /@graphql-tools\//, 'graphql-middleware'],
       },
     },
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.ts'],
+      // schemaTypes.ts is type-only (erased at runtime); it is exercised by the
+      // type-checked tests, not at runtime, so it has nothing to cover here.
+      exclude: ['src/schemaTypes.ts'],
+      thresholds: {
+        statements: 95,
+        branches: 90,
+        functions: 95,
+        lines: 95,
+      },
+    },
   },
 });

@@ -52,6 +52,21 @@ describe('graphql-casl codegen plugin', () => {
     );
   });
 
+  it('emits an empty subject map for a schema with no object types', async () => {
+    // only a root type exists, so no subjects are listed
+    const minimal = buildSchema('type Query { ok: Boolean }');
+    const out = (await plugin(minimal, [], {})) as Types.ComplexPluginOutput;
+    expect(out.content).toContain('createSubjects<AppSubjectMap>()({} as const)');
+  });
+
+  it('validate accepts valid (string / undefined / absent) config', async () => {
+    await expect(
+      validate(schema, [], { subjectConstName: 'S', importPath: undefined }, 'out.ts', []),
+    ).resolves.toBeUndefined();
+    await expect(validate(schema, [], {}, 'out.ts', [])).resolves.toBeUndefined();
+    await expect(validate(schema, [], undefined as never, 'out.ts', [])).resolves.toBeUndefined();
+  });
+
   it('validate rejects non-string config values', async () => {
     await expect(validate(schema, [], { subjectConstName: 123 }, 'out.ts', [])).rejects.toThrow(
       /must be a string/,

@@ -12,5 +12,15 @@ export default defineConfig({
         inline: ['graphql'],
       },
     },
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.ts'],
+      thresholds: {
+        statements: 95,
+        branches: 90,
+        functions: 95,
+        lines: 95,
+      },
+    },
   },
 });

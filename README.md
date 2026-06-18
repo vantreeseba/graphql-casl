@@ -74,7 +74,7 @@ import {
 } from '@vantreeseba/graphql-casl';
 import type { Resolvers, ResolversTypes } from './__generated__/resolvers.js';
 
-type AppSubjectMap = SubjectMap<Resolvers, ResolversTypes>;
+export type AppSubjectMap = SubjectMap<Resolvers, ResolversTypes>;
 export type AppAbility = GraphQLAbility<AppSubjectMap>;
 
 export const typed = createTyped<AppSubjectMap>();
@@ -97,9 +97,9 @@ export function defineAbilitiesFor(userId: string | undefined): AppAbility {
 ```ts
 import { createCan } from '@vantreeseba/graphql-casl';
 import type { Context } from './context.js';
-import { type AppAbility, defineAbilitiesFor, typed } from './abilities.js';
+import { type AppSubjectMap, defineAbilitiesFor, typed } from './abilities.js';
 
-const canUser = createCan<Context, AppAbility>(
+const canUser = createCan<Context, AppSubjectMap>(
   async (ctx) => defineAbilitiesFor(ctx.userId),
   (ctx) => ctx.userId != null,
   typed,
@@ -108,12 +108,14 @@ const canUser = createCan<Context, AppAbility>(
 
 ### 3. Declare the permissions map
 
-`getSubjectData` pulls condition values out of the resolver args; without it the
-rule checks against the bare subject type.
+`getSubjectData` builds the subject instance from the resolver args; the subject
+name narrows its return to that subject's fields, so annotate `args` with your
+generated `*Args` type to type the extraction end to end. Without it the rule
+checks against the bare subject type.
 
 ```ts
 import { accept, deny, type PermissionsMap } from '@vantreeseba/graphql-casl';
-import type { Resolvers, MutationUpdateNotesArgs } from './__generated__/resolvers.js';
+import type { Resolvers, MutationUpdateNoteArgs } from './__generated__/resolvers.js';
 
 export const permissions: PermissionsMap<Resolvers> = {
   Query: {
@@ -123,8 +125,8 @@ export const permissions: PermissionsMap<Resolvers> = {
   Mutation: {
     requestMagicLink: accept, // public
     deleteNotes: deny,        // nobody, ever
-    updateNotes: canUser<MutationUpdateNotesArgs>(Actions.update, Subject.Note, (args) => ({
-      userId: args.where?.userId?.eq,
+    updateNote: canUser(Actions.update, Subject.Note, (args: MutationUpdateNoteArgs) => ({
+      userId: args.userId,
     })),
   },
 };

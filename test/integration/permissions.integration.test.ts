@@ -59,7 +59,7 @@ function defineAbilitiesFor(userId: string | undefined): AppAbility {
   return build();
 }
 
-const canUser = createCan<Context, AppAbility>(
+const canUser = createCan<Context, AppSubjectMap>(
   async (ctx) => defineAbilitiesFor(ctx.userId),
   (ctx) => ctx.userId != null,
   typed,
@@ -122,7 +122,7 @@ const permissions: PermissionsMap<Resolvers> = {
     secret: deny, // never allowed
   },
   Mutation: {
-    updateNote: canUser<{ id: string; userId: string }>(Actions.update, 'Note', (args) => ({
+    updateNote: canUser(Actions.update, 'Note', (args: { id: string; userId: string }) => ({
       userId: args.userId,
     })),
     deleteNote: accept, // public for the sake of the test

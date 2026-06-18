@@ -29,7 +29,7 @@ function defineAbilitiesFor(userId: string | undefined): AppAbility {
   return build();
 }
 
-const canUser = createCan<Context, AppAbility>(
+const canUser = createCan<Context, AppSubjectMap>(
   async (ctx) => defineAbilitiesFor(ctx.userId),
   (ctx) => ctx.userId != null,
   typed,
@@ -40,7 +40,7 @@ const permissions: PermissionsMap<Resolvers> = {
     notes: canUser(Actions.read, Subject.Note),
   },
   Mutation: {
-    updateNote: canUser<MutationUpdateNoteArgs>(Actions.update, Subject.Note, (args) => ({
+    updateNote: canUser(Actions.update, Subject.Note, (args: MutationUpdateNoteArgs) => ({
       userId: args.userId,
     })),
   },

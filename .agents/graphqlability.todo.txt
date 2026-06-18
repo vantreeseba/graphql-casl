@@ -52,11 +52,16 @@ mapped tuple `{ [K]: [Action, Tagged<K,TMap[K]> | K] }[keyof TMap]` is more dire
 keeps everything derived from the generated types. Revisit only if we ever accept
 class-based subjects instead of a SubjectMap.
 
-Possible follow-ups (not required)
-----------------------------------
-- createCan.getSubjectData could be typed as GqlConditionsFor<TMap[K]> now that the
-  conditions language is typed (ties into TODO.md "Parent-aware createCan").
+Possible follow-ups
+-------------------
+- DONE: createCan is now subject-map-aware. `createCan<Context, TSubjectMap>(...)`;
+  `getSubjectData` returns `Partial<TSubjectMap[K]>` (subject field VALUES, not the
+  operator condition type — conditions live on the ability rules). Call convention
+  changed from `canUser<Args>(...)` to annotating the callback arg:
+  `canUser(action, subject, (args: Args) => ({...}))`, so K (subject) and Args are
+  both inferred. Added BuildSubject<TSubjectMap> export + a compile-time test.
 - Schema-driven condition/input typing — see prisma-schema-typing.todo.txt.
+- NEXT: codegen plugin.
 - Rule validation against the live GraphQLSchema at load time (reject stored rules
   referencing unknown subjects/fields) — see prisma-schema-typing.todo.txt.
 

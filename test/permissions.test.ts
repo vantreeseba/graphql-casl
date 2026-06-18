@@ -50,7 +50,7 @@ describe('accept / deny', () => {
 });
 
 describe('createCan', () => {
-  const canUser = createCan<TestContext, TestAbility>(
+  const canUser = createCan<TestContext, ExampleSubjectMap>(
     async (ctx) => buildAbility(ctx.userId),
     (ctx) => ctx.userId != null,
     typed,
@@ -69,7 +69,7 @@ describe('createCan', () => {
   });
 
   it('forbids when subject conditions do not match', async () => {
-    const rule = canUser<{ userId: string }>(Actions.update, 'Note', (args) => ({
+    const rule = canUser(Actions.update, 'Note', (args: { userId: string }) => ({
       userId: args.userId,
     }));
     const resolve = vi.fn();
@@ -81,7 +81,7 @@ describe('createCan', () => {
 
   it('allows when subject conditions match via a typed subject', async () => {
     const resolve = vi.fn().mockResolvedValue('updated');
-    const rule = canUser<{ userId: string }>(Actions.update, 'Note', (args) => ({
+    const rule = canUser(Actions.update, 'Note', (args: { userId: string }) => ({
       userId: args.userId,
     }));
     await expect(rule(resolve, null, { userId: 'u1' }, { userId: 'u1' }, info)).resolves.toBe(
@@ -89,10 +89,18 @@ describe('createCan', () => {
     );
   });
 
+  it('types getSubjectData against the subject fields (compile-time)', () => {
+    // @ts-expect-error `nope` is not a field of Note
+    canUser(Actions.update, 'Note', (args: { x: string }) => ({ nope: args.x }));
+    // a real field typechecks
+    canUser(Actions.update, 'Note', (args: { userId: string }) => ({ userId: args.userId }));
+    expect(true).toBe(true);
+  });
+
   it('throws if getSubjectData is used without configuring buildSubject', () => {
     // Omitting buildSubject yields the RequireCanBare overload, which forbids
     // getSubjectData at compile time; cast past it to exercise the runtime guard.
-    const canBare = createCan<TestContext, TestAbility>(
+    const canBare = createCan<TestContext, ExampleSubjectMap>(
       async (ctx) => buildAbility(ctx.userId),
       (ctx) => ctx.userId != null,
     ) as unknown as (

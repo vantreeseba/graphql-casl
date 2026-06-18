@@ -78,7 +78,7 @@ const Subject = createSubjects<AppSubjectMap>()({ Todo: 'Todo' } as const);
 
 // 4. createCan: bind the ability + auth check into a rule builder ------------
 
-const canUser = createCan<Context, AppAbility>(
+const canUser = createCan<Context, AppSubjectMap>(
   async (ctx) => defineAbilitiesFor(ctx.userId),
   (ctx) => ctx.userId != null,
   typed, // pass the tagger to enable condition checks (no cast needed)
@@ -146,9 +146,9 @@ const permissions: PermissionsMap<Resolvers> = {
   },
   Mutation: {
     addTodo: canUser(Actions.create, Subject.Todo),
-    // Condition pulled from args, typed with the generated `MutationSetDoneArgs`:
-    // callers may only flip their own todos.
-    setDone: canUser<MutationSetDoneArgs>(Actions.update, Subject.Todo, (args) => ({
+    // Subject instance built from args (annotate `args` with the generated
+    // `MutationSetDoneArgs`): callers may only flip their own todos.
+    setDone: canUser(Actions.update, Subject.Todo, (args: MutationSetDoneArgs) => ({
       ownerId: args.ownerId,
     })),
     deleteAllTodos: deny, // wired but disabled for everyone

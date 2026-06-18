@@ -26,7 +26,7 @@
 
 export type { AbilityLike, Action } from './ability.js';
 export { Actions } from './ability.js';
-export type { RequireCan, RequireCanBare } from './createCan.js';
+export type { BuildSubject, RequireCan, RequireCanBare } from './createCan.js';
 export { createCan } from './createCan.js';
 export type {
   GqlConditions,

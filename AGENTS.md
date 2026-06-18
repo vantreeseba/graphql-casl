@@ -35,6 +35,8 @@ src/
   createCan.ts      — factory tying a CASL ability to the rule layer
 test/
   permissions.test.ts                       — unit tests for the rule primitives
+  example.test.ts                            — runnable "todos" worked example / reference docs
+  example.codegen.ts                         — trimmed `graphql-codegen` output the example consumes
   integration/
     permissions.integration.test.ts         — end-to-end test against an executable schema
 vitest.config.ts    — dedupes/inlines graphql so it loads as a single instance under vitest

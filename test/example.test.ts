@@ -1,0 +1,244 @@
+/**
+ * Worked example: a tiny "todos" API secured with @vantreeseba/graphql-casl.
+ *
+ * This file doubles as runnable documentation. It shows every piece a real
+ * consumer wires up, end to end:
+ *
+ *   1. the domain model + request context
+ *   2. a CASL ability built per request
+ *   3. createTyped / createSubjects to tag and name subjects
+ *   4. createCan to turn abilities into field rules
+ *   5. a PermissionsMap + applyPermissions to guard the schema
+ *
+ * The generated `Resolvers` / `ResolversTypes` come from `./example.codegen.ts`
+ * (a trimmed stand-in for `graphql-codegen` output); the subject map is derived
+ * from them with `SubjectMap`, so nothing about the domain is hand-listed here.
+ */
+
+import { AbilityBuilder, createMongoAbility, type MongoAbility } from '@casl/ability';
+import { makeExecutableSchema } from '@graphql-tools/schema';
+import { type GraphQLSchema, graphql } from 'graphql';
+import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  type Action,
+  Actions,
+  abilityOptions,
+  accept,
+  applyPermissions,
+  createCan,
+  createSubjects,
+  createTyped,
+  deny,
+  type PermissionsMap,
+  type SubjectMap,
+} from '../src/index.js';
+// These come from `graphql-codegen` in a real project — see example.codegen.ts.
+import type { MutationSetDoneArgs, Resolvers, ResolversTypes, Todo } from './example.codegen.js';
+
+// 1. Domain model + request context -----------------------------------------
+
+// `Todo` is imported from the generated types above. The request context is
+// app-defined (codegen doesn't know it), so it stays here.
+interface Context {
+  /** Set when the caller is authenticated; undefined for anonymous requests. */
+  userId?: string;
+}
+
+const SEED: readonly Todo[] = [
+  { id: 't1', ownerId: 'alice', title: 'buy milk', done: false },
+  { id: 't2', ownerId: 'bob', title: 'walk dog', done: false },
+];
+let TODOS: Todo[];
+
+// 2. The per-request CASL ability --------------------------------------------
+
+// The `any` subject is intentional — see the AppAbility doc in src/ability.ts.
+// biome-ignore lint/suspicious/noExplicitAny: subject conditions are matched at runtime
+type AppAbility = MongoAbility<[Action, any]>;
+
+function defineAbilitiesFor(userId: string | undefined): AppAbility {
+  const { can, cannot, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
+  if (!userId) {
+    cannot(Actions.manage, 'all'); // anonymous callers can do nothing
+    return build(abilityOptions);
+  }
+  can(Actions.read, 'Todo'); // read any todo
+  can(Actions.create, 'Todo'); // create todos
+  can(Actions.update, 'Todo', { ownerId: userId }); // but only update your own
+  return build(abilityOptions);
+}
+
+// 3. Subjects: a typed tagger + a const of subject names ---------------------
+
+// `SubjectMap` derives the subject types straight from the generated
+// `Resolvers` / `ResolversTypes`: it drops root operations (Query/Mutation) and
+// scalars, leaving `{ Todo: Partial<Todo> }` here — no manual type listing.
+type AppSubjectMap = SubjectMap<Resolvers, ResolversTypes>;
+
+// `typed` tags plain objects with __typename so CASL can classify them at
+// runtime; `Subject` gives autocompleted, typo-proof subject-name literals.
+const typed = createTyped<AppSubjectMap>();
+const Subject = createSubjects<AppSubjectMap>()({ Todo: 'Todo' } as const);
+
+// 4. createCan: bind the ability + auth check into a rule builder ------------
+
+const canUser = createCan<Context, AppAbility>(
+  async (ctx) => defineAbilitiesFor(ctx.userId),
+  (ctx) => ctx.userId != null,
+  typed, // pass the tagger to enable condition checks (no cast needed)
+);
+
+// 5. Schema + resolvers ------------------------------------------------------
+
+const typeDefs = /* GraphQL */ `
+  type Query {
+    todos: [Todo!]!
+    health: String!
+  }
+  type Mutation {
+    addTodo(title: String!): Todo!
+    # ownerId is part of the input so the rule can check ownership from args
+    # alone — middleware runs before the resolver and only sees parent/args/context.
+    setDone(id: ID!, ownerId: ID!, done: Boolean!): Todo
+    deleteAllTodos: Boolean
+  }
+  type Todo {
+    id: ID!
+    ownerId: ID!
+    title: String!
+    done: Boolean!
+  }
+`;
+
+// Typing the resolver map as the generated `Resolvers<Context>` is exactly what
+// a codegen consumer does — it checks every resolver against the schema.
+const resolvers: Resolvers<Context> = {
+  Query: {
+    todos: () => TODOS,
+    health: () => 'ok',
+  },
+  Mutation: {
+    addTodo: (_parent, args, ctx): Todo => {
+      const todo: Todo = {
+        id: `t${TODOS.length + 1}`,
+        ownerId: ctx.userId as string,
+        title: args.title,
+        done: false,
+      };
+      TODOS.push(todo);
+      return todo;
+    },
+    setDone: (_parent, args) => {
+      const todo = TODOS.find((t) => t.id === args.id);
+      if (!todo) return null;
+      todo.done = args.done;
+      return todo;
+    },
+    deleteAllTodos: () => {
+      TODOS = [];
+      return true;
+    },
+  },
+};
+
+// 6. The permissions map -----------------------------------------------------
+
+const permissions: PermissionsMap<Resolvers> = {
+  Query: {
+    todos: canUser(Actions.read, Subject.Todo),
+    health: accept, // public field — runs without an auth check
+  },
+  Mutation: {
+    addTodo: canUser(Actions.create, Subject.Todo),
+    // Condition pulled from args, typed with the generated `MutationSetDoneArgs`:
+    // callers may only flip their own todos.
+    setDone: canUser<MutationSetDoneArgs>(Actions.update, Subject.Todo, (args) => ({
+      ownerId: args.ownerId,
+    })),
+    deleteAllTodos: deny, // wired but disabled for everyone
+  },
+};
+
+let schema: GraphQLSchema;
+
+beforeEach(() => {
+  // Resolvers mutate TODOS in place; reset from the seed before each test.
+  TODOS = SEED.map((t) => ({ ...t }));
+  schema = applyPermissions<Resolvers>(makeExecutableSchema({ typeDefs, resolvers }), permissions);
+});
+
+function run(source: string, ctx: Context, variableValues?: Record<string, unknown>) {
+  return graphql({ schema, source, contextValue: ctx, variableValues });
+}
+
+// 7. The behavior a consumer gets -------------------------------------------
+
+const SET_DONE = `
+  mutation ($id: ID!, $ownerId: ID!, $done: Boolean!) {
+    setDone(id: $id, ownerId: $ownerId, done: $done) { id done }
+  }
+`;
+
+describe('todos example', () => {
+  it('lets a public field through without auth (accept)', async () => {
+    const ctx = {};
+
+    const result = await run('{ health }', ctx);
+    expect(result.errors).toBeUndefined();
+    expect(result.data?.health).toBe('ok');
+  });
+
+  it('blocks an anonymous read with "Not authenticated"', async () => {
+    const ctx = {};
+
+    const result = await run('{ todos { id } }', ctx);
+    // todos is non-null ([Todo!]!), so the error bubbles up and nulls all data.
+    expect(result.data).toBeNull();
+    expect(result.errors?.[0]?.message).toBe('Not authenticated');
+  });
+
+  it('allows an authenticated read', async () => {
+    const ctx = { userId: 'alice' };
+
+    const result = await run('{ todos { id title } }', ctx);
+    expect(result.errors).toBeUndefined();
+    expect(result.data?.todos).toHaveLength(2);
+  });
+
+  it('lets an authenticated caller create a todo', async () => {
+    const ctx = { userId: 'alice' };
+
+    const result = await run('mutation { addTodo(title: "ship it") { id title } }', ctx);
+    expect(result.errors).toBeUndefined();
+    expect(result.data?.addTodo).toMatchObject({ title: 'ship it' });
+    expect(TODOS).toHaveLength(3);
+  });
+
+  it('lets you complete your own todo (condition matches)', async () => {
+    const ctx = { userId: 'alice' };
+    const variables = { id: 't1', ownerId: 'alice', done: true };
+
+    const result = await run(SET_DONE, ctx, variables);
+    expect(result.errors).toBeUndefined();
+    expect(result.data?.setDone).toMatchObject({ id: 't1', done: true });
+  });
+
+  it('forbids completing someone else’s todo (condition fails)', async () => {
+    const ctx = { userId: 'alice' };
+    const variables = { id: 't2', ownerId: 'bob', done: true };
+
+    const result = await run(SET_DONE, ctx, variables);
+    expect(result.data?.setDone).toBeNull();
+    expect(result.errors?.[0]?.message).toBe('Forbidden');
+    expect(TODOS.find((t) => t.id === 't2')?.done).toBe(false); // resolver never ran
+  });
+
+  it('always denies a field guarded by deny', async () => {
+    const ctx = { userId: 'alice' };
+
+    const result = await run('mutation { deleteAllTodos }', ctx);
+    expect(result.data?.deleteAllTodos).toBeNull();
+    expect(result.errors?.[0]?.message).toBe('Forbidden');
+    expect(TODOS).toHaveLength(2); // resolver never ran
+  });
+});

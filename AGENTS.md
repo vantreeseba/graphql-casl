@@ -27,9 +27,10 @@ Deferred work is tracked per package (`packages/graphql-casl/TODO.md`) and in
   (generated, not committed; CI publishes them to the GitHub Wiki on `main`)
 - **graphql-casl peer deps:** `@casl/ability >=6`, `graphql >=16`, `graphql-middleware >=6`;
   no runtime dependencies
-- **graphql-casl-codegen peer deps:** `@graphql-codegen/plugin-helpers >=5`, `graphql >=16`
-- **Releases:** per-package semantic-release via `semantic-release-monorepo`
-  (each package has its own `.releaserc.json`); the release workflow matrixes over packages
+- **graphql-casl-codegen peer deps:** `@graphql-codegen/plugin-helpers >=5`, `graphql >=16`,
+  `@vantreeseba/graphql-casl` (the runtime its generated code imports from)
+- **Releases:** a single, repo-wide version via root `semantic-release` (one `v${version}`
+  tag); `@semantic-release/exec` publishes every workspace together
 
 ## Project structure
 

@@ -14,8 +14,8 @@
   },
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "files": [
@@ -34,7 +34,13 @@
   },
   "peerDependencies": {
     "@graphql-codegen/plugin-helpers": ">=5",
+    "@vantreeseba/graphql-casl": ">=0.2.1",
     "graphql": ">=16"
+  },
+  "peerDependenciesMeta": {
+    "@vantreeseba/graphql-casl": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@graphql-codegen/plugin-helpers": "^5.1.1",

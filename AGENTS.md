@@ -86,10 +86,11 @@ vitest.config.ts (per package) — dedupes/inlines graphql so it loads as a sing
 - Keep the summary imperative and under ~72 characters; add a body when the why
   isn't obvious from the diff.
 - One logical change per commit.
-- Commit messages **drive releases** — `feat:` triggers a minor bump, `fix:` a
-  patch, and a `BREAKING CHANGE:` footer a major. `chore:`/`docs:`/`test:`/`ci:`
-  do not publish. Scope commits to the affected package so per-package release
-  notes stay accurate (e.g. `feat(codegen): …`).
+- Commit messages **drive the (repo-wide) release** — `feat:` triggers a minor
+  bump, `fix:` a patch, and a `BREAKING CHANGE:` footer a major.
+  `chore:`/`docs:`/`test:`/`ci:` do not publish. A scope is optional but useful
+  for clarity (e.g. `feat(codegen): …`); versioning is unified, so any release
+  publishes every package.
 
 ## CI & releases
 
@@ -99,20 +100,20 @@ Two GitHub Actions workflows:
   test, coverage, build (all via root scripts that fan out to workspaces), then
   publishes TypeDoc from `packages/graphql-casl/docs/api/` to the wiki on `main`.
 - **`.github/workflows/release.yml`** — runs after **Test** succeeds on `main`,
-  matrixing over packages and running `npx semantic-release` in each package dir.
+  then runs `npx semantic-release` once at the repo root.
 
-Releases are per-package via [semantic-release](https://semantic-release.gitbook.io/)
-+ [`semantic-release-monorepo`](https://github.com/pmowrer/semantic-release-monorepo)
-(each package has its own `.releaserc.json`): commit analysis is scoped to commits
-touching that package's path, and tags are package-name-prefixed.
+Releases use a **single, repo-wide version** ([semantic-release](https://semantic-release.gitbook.io/)
+at the root, `.releaserc.json`): one `v${version}` git tag and one GitHub release
+drive the version, and `@semantic-release/exec` bumps and publishes **every**
+workspace together (`npm version … --workspaces`, then `npm publish --workspaces`)
+— even a package with no changes ships at the new shared version. The root
+`package.json` is `private`, so only the public sub-packages publish.
 
 - Requires repo secret **`NPM_ACCESS_TOKEN`** (or OIDC trusted publishing).
   `GITHUB_TOKEN` is provided by Actions.
-- **Migration note:** `semantic-release-monorepo` changes the tag format from
-  `vX.Y.Z` to a package-prefixed tag, so the existing `graphql-casl` tag history
-  isn't matched. Before the first monorepo release, seed an initial prefixed tag
-  for `graphql-casl` (matching its current `0.2.0`) or its next release will jump
-  to `1.0.0`. Validate with a `semantic-release --dry-run` per package.
+- The plain `v${version}` tag format continues the existing `v0.x` tag history
+  (no migration/seeding needed). Validate with `npx semantic-release --dry-run`
+  at the root.
 
 ## Running locally
 

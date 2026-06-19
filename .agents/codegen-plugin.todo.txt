@@ -30,20 +30,22 @@ What shipped
 Verified: build, typecheck, typecheck:tests, test (graphql-casl 33 + codegen 3),
 coverage, docs, biome — all green across both workspaces.
 
-RELEASE MIGRATION — NEEDS MAINTAINER VALIDATION (cannot test publish here)
--------------------------------------------------------------------------
-- Switched to per-package semantic-release via semantic-release-monorepo
-  (packages/*/.releaserc.json; root .releaserc.json deleted). This changes the git
-  TAG FORMAT from `vX.Y.Z` to a package-name-prefixed tag, so the existing
-  graphql-casl tag history is NOT matched.
-  ACTION before first monorepo release on main:
-    1. Seed an initial prefixed tag for graphql-casl matching current 0.2.0 (else
-       its next release jumps to 1.0.0).
-    2. Run `npx semantic-release --dry-run` in each package dir to confirm the next
-       version + tag + npm publish target.
-    3. Confirm npm auth (NPM_ACCESS_TOKEN or OIDC trusted publishing) works for BOTH
-       package names, incl. first-publish access for @vantreeseba/graphql-casl-codegen.
-- graphql-casl-codegen starts at 0.0.0; first release will set its real version.
+RELEASE — unified, repo-wide version (resolves review #10/#11/#15)
+-----------------------------------------------------------------
+- Single semantic-release at the REPO ROOT (.releaserc.json); semantic-release-monorepo
+  and the per-package .releaserc files were removed. One `v${version}` tag + one
+  GitHub release drive the version; @semantic-release/exec bumps and publishes ALL
+  workspaces together: prepareCmd `npm version <v> --workspaces`, publishCmd
+  `npm publish --workspaces`. Root package.json is private, so only the public
+  sub-packages publish. Both sub-packages are aligned at 0.2.1.
+- Plain `v${version}` tag format CONTINUES the existing v0.x history — no tag
+  seeding/migration needed (review #11 resolved). Validated with
+  `npx semantic-release --dry-run` at root: finds the v0.x tag, computes 1.0.0
+  (breaking changes), skips publish in dry-run.
+- STILL needs maintainer confirmation (cannot test a real publish here): npm auth
+  (OIDC trusted publishing / NPM_ACCESS_TOKEN) works for BOTH names, incl.
+  first-publish access for @vantreeseba/graphql-casl-codegen (`npm publish
+  --workspaces` will attempt to publish it for the first time).
 
 Possible follow-ups
 -------------------

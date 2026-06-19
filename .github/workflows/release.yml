@@ -17,11 +17,6 @@ jobs:
       issues: write
       pull-requests: write
       id-token: write
-    strategy:
-      # Run packages serially so their release commits don't race.
-      max-parallel: 1
-      matrix:
-        package: [graphql-casl, graphql-casl-codegen]
     steps:
       - uses: actions/checkout@v5
         with:
@@ -40,8 +35,10 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Release ${{ matrix.package }}
-        working-directory: packages/${{ matrix.package }}
+      # One repo-wide version: semantic-release runs at the root, derives the
+      # version from `v*` tags, and (via @semantic-release/exec) bumps and
+      # publishes every workspace together.
+      - name: Release
         run: npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

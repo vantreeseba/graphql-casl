@@ -30,6 +30,6 @@ npm run test -w packages/graphql-casl-codegen
 ```
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/) and
-drive automated, per-package releases via
-[semantic-release](https://semantic-release.gitbook.io/) +
-[`semantic-release-monorepo`](https://github.com/pmowrer/semantic-release-monorepo).
+drive a single, repo-wide release via
+[semantic-release](https://semantic-release.gitbook.io/): one version and tag for
+the whole repo, with every package published together at that version.

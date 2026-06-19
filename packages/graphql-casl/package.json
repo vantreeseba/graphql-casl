@@ -1,6 +1,6 @@
 {
   "name": "@vantreeseba/graphql-casl",
-  "version": "0.2.1",
+  "version": "1.0.0",
   "description": "GraphQL middleware plugin for defining CASL permission rules on resolvers.",
   "type": "module",
   "repository": {

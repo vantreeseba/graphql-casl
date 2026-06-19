@@ -1,3 +1,38 @@
+# [1.0.0](https://github.com/vantreeseba/graphql-casl/compare/v0.2.1...v1.0.0) (2026-06-19)
+
+
+### Bug Fixes
+
+* address code-review findings (matcher, tagging, codegen, IDOR) ([8dec69d](https://github.com/vantreeseba/graphql-casl/commit/8dec69defb751d881f8b79377f4e7a1ae1cf7e76))
+* review pass — packaging, codegen peer dep, release auth, docs ([3b29ecd](https://github.com/vantreeseba/graphql-casl/commit/3b29ecdd7488c91d5a6eddd7c4bace627a6051d3))
+* tighten AbilityLike typing and fail loud on untagged subjects ([fa93235](https://github.com/vantreeseba/graphql-casl/commit/fa93235c59d321a57c821203c0fcc814e01ea144))
+
+
+### Features
+
+* **codegen:** add codegen plugin in an npm-workspaces monorepo ([1514c36](https://github.com/vantreeseba/graphql-casl/commit/1514c3670f5eec47dfb91f60db07b71bb21184f0))
+* replace MongoAbility with a schema-typed GraphQLAbility ([ca3e6eb](https://github.com/vantreeseba/graphql-casl/commit/ca3e6eb36740d44528fe05bc6fdff8b6b4983a29))
+* type getSubjectData against the subject's fields ([8c327aa](https://github.com/vantreeseba/graphql-casl/commit/8c327aa6f663a955200421ee44e463a9d16668bd))
+
+
+### BREAKING CHANGES
+
+* condition operators are now CASL mongo-style ($in/$gt/$ne/…)
+instead of the previous bare names (in/gt/ne); the GqlOperators/GqlConditions/
+GqlFieldCondition/GqlConditionsFor types and gqlConditionsMatcher are removed.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+* createCan's second type parameter is now the SubjectMap, not
+the ability type, and getSubjectData's args are typed by annotating the
+callback parameter instead of passing canUser<Args>(...).
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+* AppAbility and abilityOptions are removed. Build abilities
+with createGraphQLAbility/buildGraphQLAbility; conditions now use the
+eq/ne/in/nin/gt/gte/lt/lte operator set instead of mongo-query operators.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+
 ## [0.2.1](https://github.com/vantreeseba/graphql-casl/compare/v0.2.0...v0.2.1) (2026-06-18)
 
 

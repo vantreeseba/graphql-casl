@@ -1,3 +1,10 @@
+## [0.2.1](https://github.com/vantreeseba/graphql-casl/compare/v0.2.0...v0.2.1) (2026-06-18)
+
+
+### Bug Fixes
+
+* trigger release ([6e1b745](https://github.com/vantreeseba/graphql-casl/commit/6e1b7458c6d6224f3c2fd32bf203d5688e5e0f5a))
+
 # [0.2.0](https://github.com/vantreeseba/graphql-casl/compare/v0.1.1...v0.2.0) (2026-06-18)
 
 

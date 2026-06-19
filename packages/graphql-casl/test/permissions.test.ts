@@ -1,23 +1,16 @@
-import { AbilityBuilder, createMongoAbility, type MongoAbility } from '@casl/ability';
 import type { GraphQLResolveInfo } from 'graphql';
 import { describe, expect, it, vi } from 'vitest';
 import {
   type Action,
   Actions,
-  abilityOptions,
   accept,
   createCan,
+  createGraphQLAbility,
   createSubjects,
   createTyped,
   deny,
+  type GraphQLAbility,
 } from '../src/index.js';
-
-// biome-ignore lint/suspicious/noExplicitAny: see AppAbility doc in src/ability.ts
-type TestAbility = MongoAbility<[Action, any]>;
-
-interface TestContext {
-  userId?: string;
-}
 
 // An example subject map — in a real app this comes from SubjectMap<Resolvers, ResolversTypes>.
 type ExampleSubjectMap = {
@@ -25,17 +18,20 @@ type ExampleSubjectMap = {
   Org: { id: string };
 };
 
+type TestAbility = GraphQLAbility<ExampleSubjectMap>;
+
+interface TestContext {
+  userId?: string;
+}
+
 const typed = createTyped<ExampleSubjectMap>();
 
 function buildAbility(userId: string | undefined): TestAbility {
-  const { can, cannot, build } = new AbilityBuilder<TestAbility>(createMongoAbility);
-  if (!userId) {
-    cannot(Actions.manage, 'all');
-    return build(abilityOptions);
-  }
+  const { can, build } = createGraphQLAbility<ExampleSubjectMap>();
+  if (!userId) return build(); // no rules ⇒ everything denied
   can(Actions.read, 'Note');
   can(Actions.update, 'Note', { userId });
-  return build(abilityOptions);
+  return build();
 }
 
 // A stand-in resolve info object — rules never read it, so an empty cast is fine.
@@ -54,7 +50,7 @@ describe('accept / deny', () => {
 });
 
 describe('createCan', () => {
-  const canUser = createCan<TestContext, TestAbility>(
+  const canUser = createCan<TestContext, ExampleSubjectMap>(
     async (ctx) => buildAbility(ctx.userId),
     (ctx) => ctx.userId != null,
     typed,
@@ -73,7 +69,7 @@ describe('createCan', () => {
   });
 
   it('forbids when subject conditions do not match', async () => {
-    const rule = canUser<{ userId: string }>(Actions.update, 'Note', (args) => ({
+    const rule = canUser(Actions.update, 'Note', (args: { userId: string }) => ({
       userId: args.userId,
     }));
     const resolve = vi.fn();
@@ -85,7 +81,7 @@ describe('createCan', () => {
 
   it('allows when subject conditions match via a typed subject', async () => {
     const resolve = vi.fn().mockResolvedValue('updated');
-    const rule = canUser<{ userId: string }>(Actions.update, 'Note', (args) => ({
+    const rule = canUser(Actions.update, 'Note', (args: { userId: string }) => ({
       userId: args.userId,
     }));
     await expect(rule(resolve, null, { userId: 'u1' }, { userId: 'u1' }, info)).resolves.toBe(
@@ -93,10 +89,18 @@ describe('createCan', () => {
     );
   });
 
+  it('types getSubjectData against the subject fields (compile-time)', () => {
+    // @ts-expect-error `nope` is not a field of Note
+    canUser(Actions.update, 'Note', (args: { x: string }) => ({ nope: args.x }));
+    // a real field typechecks
+    canUser(Actions.update, 'Note', (args: { userId: string }) => ({ userId: args.userId }));
+    expect(true).toBe(true);
+  });
+
   it('throws if getSubjectData is used without configuring buildSubject', () => {
     // Omitting buildSubject yields the RequireCanBare overload, which forbids
     // getSubjectData at compile time; cast past it to exercise the runtime guard.
-    const canBare = createCan<TestContext, TestAbility>(
+    const canBare = createCan<TestContext, ExampleSubjectMap>(
       async (ctx) => buildAbility(ctx.userId),
       (ctx) => ctx.userId != null,
     ) as unknown as (
@@ -113,6 +117,12 @@ describe('createCan', () => {
 describe('createTyped', () => {
   it('tags attrs with __typename', () => {
     expect(typed('Note', { id: '1' })).toEqual({ __typename: 'Note', id: '1' });
+  });
+
+  it('the __typename tag wins over a conflicting attrs.__typename', () => {
+    // A caller (via JS/cast) cannot mis-tag the subject through attrs.
+    const tagged = typed('Note', { __typename: 'Org', id: '1' } as never);
+    expect(tagged.__typename).toBe('Note');
   });
 });
 

@@ -7,24 +7,33 @@
  * `createTyped`, `createSubjects`, `accept`, `deny`) are bound to your app's
  * context shape and ability builder at call time.
  *
- * `AppAbility` uses `MongoAbility<[Action, any]>` because `__typename`-based
- * runtime subject detection cannot provide static condition typing without
- * CASL's `ForcedSubject`.
+ * Abilities are statically typed: derive a {@link GraphQLAbility} from your
+ * `SubjectMap` and build it with {@link createGraphQLAbility} (or rehydrate
+ * stored rules with {@link buildGraphQLAbility}). Conditions use CASL's standard
+ * mongo-query operators (`$eq`/`$in`/`$gt`/…); subjects are detected via `__typename`.
  *
  * Modules:
  * - `schemaTypes` — type helpers derived from generated `Resolvers`/`ResolversTypes`
  * - `rules` — the `graphql-middleware` rule layer (`Rule`, `PermissionsMap`, `applyPermissions`, `accept`, `deny`)
- * - `ability` — CASL `Action`/`Actions`/`AppAbility`/`abilityOptions`
+ * - `ability` — CASL `Action` / `Actions` / `AbilityLike`
+ * - `graphqlAbility` — the schema-typed `GraphQLAbility` / `createGraphQLAbility` / `buildGraphQLAbility`
  * - `subjects` — `createSubjects` / `createTyped`
  * - `createCan` — the factory tying abilities to rules
  *
  * @packageDocumentation
  */
 
-export type { AbilityLike, Action, AppAbility } from './ability.js';
-export { Actions, abilityOptions } from './ability.js';
-export type { RequireCan, RequireCanBare } from './createCan.js';
+export type { AbilityLike, Action } from './ability.js';
+export { Actions } from './ability.js';
+export type { BuildSubject, RequireCan, RequireCanBare } from './createCan.js';
 export { createCan } from './createCan.js';
+export type {
+  GraphQLAbilities,
+  GraphQLAbility,
+  GraphQLAbilityOptions,
+  GraphQLRule,
+} from './graphqlAbility.js';
+export { buildGraphQLAbility, createGraphQLAbility } from './graphqlAbility.js';
 export type { PermissionsMap, Rule } from './rules.js';
 export { accept, applyPermissions, deny } from './rules.js';
 export type { ArgsOf, ContextOf, ParentOf, SubjectMap, SubjectName } from './schemaTypes.js';

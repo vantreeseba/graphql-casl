@@ -15,20 +15,19 @@
  * from them with `SubjectMap`, so nothing about the domain is hand-listed here.
  */
 
-import { AbilityBuilder, createMongoAbility, type MongoAbility } from '@casl/ability';
 import { makeExecutableSchema } from '@graphql-tools/schema';
 import { type GraphQLSchema, graphql } from 'graphql';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  type Action,
   Actions,
-  abilityOptions,
   accept,
   applyPermissions,
   createCan,
+  createGraphQLAbility,
   createSubjects,
   createTyped,
   deny,
+  type GraphQLAbility,
   type PermissionsMap,
   type SubjectMap,
 } from '../src/index.js';
@@ -52,28 +51,25 @@ let TODOS: Todo[];
 
 // 2. The per-request CASL ability --------------------------------------------
 
-// The `any` subject is intentional — see the AppAbility doc in src/ability.ts.
-// biome-ignore lint/suspicious/noExplicitAny: subject conditions are matched at runtime
-type AppAbility = MongoAbility<[Action, any]>;
-
-function defineAbilitiesFor(userId: string | undefined): AppAbility {
-  const { can, cannot, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
-  if (!userId) {
-    cannot(Actions.manage, 'all'); // anonymous callers can do nothing
-    return build(abilityOptions);
-  }
-  can(Actions.read, 'Todo'); // read any todo
-  can(Actions.create, 'Todo'); // create todos
-  can(Actions.update, 'Todo', { ownerId: userId }); // but only update your own
-  return build(abilityOptions);
-}
-
-// 3. Subjects: a typed tagger + a const of subject names ---------------------
-
 // `SubjectMap` derives the subject types straight from the generated
 // `Resolvers` / `ResolversTypes`: it drops root operations (Query/Mutation) and
 // scalars, leaving `{ Todo: Partial<Todo> }` here — no manual type listing.
 type AppSubjectMap = SubjectMap<Resolvers, ResolversTypes>;
+
+// A schema-typed ability: `can`/`cannot` conditions are checked against the
+// subject's fields, and `build()` wires `__typename` detection + the matcher.
+type AppAbility = GraphQLAbility<AppSubjectMap>;
+
+function defineAbilitiesFor(userId: string | undefined): AppAbility {
+  const { can, build } = createGraphQLAbility<AppSubjectMap>();
+  if (!userId) return build(); // no rules ⇒ anonymous callers can do nothing
+  can(Actions.read, 'Todo'); // read any todo
+  can(Actions.create, 'Todo'); // create todos
+  can(Actions.update, 'Todo', { ownerId: userId }); // but only update your own
+  return build();
+}
+
+// 3. Subjects: a typed tagger + a const of subject names ---------------------
 
 // `typed` tags plain objects with __typename so CASL can classify them at
 // runtime; `Subject` gives autocompleted, typo-proof subject-name literals.
@@ -82,7 +78,7 @@ const Subject = createSubjects<AppSubjectMap>()({ Todo: 'Todo' } as const);
 
 // 4. createCan: bind the ability + auth check into a rule builder ------------
 
-const canUser = createCan<Context, AppAbility>(
+const canUser = createCan<Context, AppSubjectMap>(
   async (ctx) => defineAbilitiesFor(ctx.userId),
   (ctx) => ctx.userId != null,
   typed, // pass the tagger to enable condition checks (no cast needed)
@@ -129,7 +125,12 @@ const resolvers: Resolvers<Context> = {
       return todo;
     },
     setDone: (_parent, args) => {
-      const todo = TODOS.find((t) => t.id === args.id);
+      // The rule authorized `ownerId` (from args, before this resolver ran), so
+      // the resolver MUST scope the write to that same `ownerId`. Looking up by
+      // `id` alone would be an IDOR: a caller could pass their own `ownerId` (to
+      // pass the check) but someone else's `id`. Middleware can't see the
+      // to-be-loaded row, so the resolver enforces the row↔owner link.
+      const todo = TODOS.find((t) => t.id === args.id && t.ownerId === args.ownerId);
       if (!todo) return null;
       todo.done = args.done;
       return todo;
@@ -150,9 +151,9 @@ const permissions: PermissionsMap<Resolvers> = {
   },
   Mutation: {
     addTodo: canUser(Actions.create, Subject.Todo),
-    // Condition pulled from args, typed with the generated `MutationSetDoneArgs`:
-    // callers may only flip their own todos.
-    setDone: canUser<MutationSetDoneArgs>(Actions.update, Subject.Todo, (args) => ({
+    // Subject instance built from args (annotate `args` with the generated
+    // `MutationSetDoneArgs`): callers may only flip their own todos.
+    setDone: canUser(Actions.update, Subject.Todo, (args: MutationSetDoneArgs) => ({
       ownerId: args.ownerId,
     })),
     deleteAllTodos: deny, // wired but disabled for everyone
@@ -231,6 +232,19 @@ describe('todos example', () => {
     expect(result.data?.setDone).toBeNull();
     expect(result.errors?.[0]?.message).toBe('Forbidden');
     expect(TODOS.find((t) => t.id === 't2')?.done).toBe(false); // resolver never ran
+  });
+
+  it('does not let a forged ownerId reach someone else’s todo (IDOR)', async () => {
+    // Attack: pass your own ownerId (so the check passes) but a victim's id.
+    const ctx = { userId: 'alice' };
+    const variables = { id: 't2', ownerId: 'alice', done: true }; // t2 is bob's
+
+    const result = await run(SET_DONE, ctx, variables);
+    // The gate passes (alice may update her own todos), but the resolver scopes
+    // the write by ownerId, so bob's todo is never found or touched.
+    expect(result.errors).toBeUndefined();
+    expect(result.data?.setDone).toBeNull();
+    expect(TODOS.find((t) => t.id === 't2')?.done).toBe(false);
   });
 
   it('always denies a field guarded by deny', async () => {

@@ -1,0 +1,56 @@
+Schema-driven condition typing (à la @casl/prisma) — exploration
+================================================================
+Status: NOT STARTED. Raised by user during the GraphQLAbility redesign.
+Prereq context: GraphQLAbility redesign is DONE (see graphqlability.todo.txt).
+
+The idea
+--------
+@casl/prisma derives per-model condition types from Prisma's generated
+`Prisma.<Model>WhereInput` (rich filters: equals/in/gt/contains/...), via:
+  - PrismaQuery<Model<User,'User'>>  -> the model's WhereInput as the condition type
+  - createPrismaAbility               -> factory bundling the prisma conditions matcher
+  - accessibleBy(ability).ofType('Post') -> rules folded into a Prisma where filter
+The user asked: can we do the analogous thing for GraphQL — "take in the gql schema
+so we can get the input types for the queries/mutations/etc"?
+
+Where this maps onto our design
+-------------------------------
+- Condition VALUE types: we already derive them from the model (SubjectMap from
+  ResolversTypes) and expose our own operator set (GqlOperators). This is the direct
+  analog of WhereInput, just hand-rolled instead of generated. Good enough unless we
+  want richer, per-field-type operators (e.g. string `contains`, only-comparable `gt`).
+  -> Possible: make GqlOperators field-type-aware (contains/startsWith for strings,
+     gt/gte/lt/lte only for number|string|Date), like Prisma's typed filters.
+- INPUT types for queries/mutations: these are the resolver ARGS (we have ArgsOf).
+  They matter for createCan's getSubjectData(args) typing, NOT for subject conditions.
+  -> Possible: type getSubjectData's return as GqlConditionsFor<TMap[subject]> and its
+     `args` param as ArgsOf<...> so arg-derived conditions are end-to-end typed.
+
+"Taking in the gql schema" (runtime GraphQLSchema) — what it could buy us
+-------------------------------------------------------------------------
+Compile-time types already come from codegen, so we do NOT need the runtime schema
+for typing. A runtime schema (or the codegen introspection) WOULD enable:
+  [ ] P1. Rule VALIDATION at load time: when rehydrating DB-stored rules
+          (buildGraphQLAbility), reject/log rules whose subject or condition fields
+          don't exist in the schema. High value for the DB-rules workflow where rules
+          are edited outside the type system. This is the most concrete win.
+  [ ] P2. A codegen-time generator that emits a typed condition map (per-field
+          operator types) from the schema — closest to what @casl/prisma gets for free
+          from Prisma's generator. Heavier; only if hand-rolled GqlOperators proves
+          too coarse.
+
+Decision points for the user
+----------------------------
+1. Richer, field-type-aware operators (string contains/startsWith; comparable-only
+   gt/lt) vs the current uniform operator set? (Serializability is preserved either way.)
+2. Type getSubjectData against the schema (ArgsOf args -> GqlConditionsFor return)? —
+   small, high-value, no runtime schema needed.
+3. Add load-time rule validation against a provided GraphQLSchema (P1)? This is the
+   only part that actually needs "taking in the gql schema."
+4. Is a codegen plugin (P2) in scope, or out (keep types purely inferred from the
+   existing codegen output)?
+
+Related
+-------
+- accessibleby.todo.txt — the @casl/prisma accessibleBy analog (rules -> filter) for
+  row/list-level fetching; shares the "rules are serializable" foundation.

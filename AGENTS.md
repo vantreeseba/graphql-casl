@@ -2,44 +2,59 @@
 
 ## Project
 
-`@vantreeseba/graphql-casl` — a `graphql-middleware` plugin for defining
-[CASL](https://casl.js.org/) permission rules that apply to GraphQL resolvers.
-Rules are declared per type/field in a `PermissionsMap` and enforced before the
-underlying resolver runs.
+An npm-workspaces monorepo for the `@vantreeseba/graphql-casl` toolkit:
+
+- **`packages/graphql-casl`** — the runtime: a `graphql-middleware` plugin for
+  defining [CASL](https://casl.js.org/) permission rules on resolvers. Rules are
+  declared per type/field in a `PermissionsMap` and enforced before the resolver runs.
+- **`packages/graphql-casl-codegen`** — a GraphQL Code Generator plugin that emits
+  subject bindings (`SubjectMap`, `Subject`, `typed`, `ability`) from a schema.
 
 ## Specifications
 
-Deferred work is tracked in [TODO.md](./TODO.md). Usage is documented in
-[README.md](./README.md).
+Deferred work is tracked per package (`packages/graphql-casl/TODO.md`) and in
+`.agents/*.todo.txt`. Usage is documented in each package's README.
 
 ## Stack
 
 - **Language:** TypeScript 5, strict mode, ESM only
+- **Monorepo:** npm workspaces; run scripts at root (delegates to packages via
+  `--workspaces`) or target one with `-w packages/<name>`
 - **Tests:** Vitest (`npm test`)
-- **Formatting/linting:** Biome (`npm run check`)
-- **Build:** `tsc` (`npm run build`) — outputs to `dist/`
-- **API docs:** TypeDoc + markdown plugin (`npm run docs`) — outputs to `docs/api/`
+- **Formatting/linting:** Biome (`npm run check`) — single root config, whole repo
+- **Build:** `tsc` per package (`npm run build`) — outputs to each package's `dist/`
+- **API docs:** TypeDoc (`npm run docs`) — `packages/graphql-casl/docs/api/`
   (generated, not committed; CI publishes them to the GitHub Wiki on `main`)
-- **Peer deps:** `@casl/ability >=6`, `graphql >=16`, `graphql-middleware >=6`
-- **No runtime dependencies** — everything ships as peer deps
+- **graphql-casl peer deps:** `@casl/ability >=6`, `graphql >=16`, `graphql-middleware >=6`;
+  no runtime dependencies
+- **graphql-casl-codegen peer deps:** `@graphql-codegen/plugin-helpers >=5`, `graphql >=16`,
+  `@vantreeseba/graphql-casl` (the runtime its generated code imports from)
+- **Releases:** a single, repo-wide version via root `semantic-release` (one `v${version}`
+  tag); `@semantic-release/exec` publishes every workspace together
 
 ## Project structure
 
 ```
-src/
-  index.ts          — public API entry point (re-exports + package overview)
-  schemaTypes.ts    — type helpers derived from generated Resolvers/ResolversTypes
-  rules.ts          — graphql-middleware rule layer (Rule, PermissionsMap, accept, deny)
-  ability.ts        — CASL Action/Actions/AppAbility/abilityOptions
-  subjects.ts       — createSubjects / createTyped
-  createCan.ts      — factory tying a CASL ability to the rule layer
-test/
-  permissions.test.ts                       — unit tests for the rule primitives
-  example.test.ts                            — runnable "todos" worked example / reference docs
-  example.codegen.ts                         — trimmed `graphql-codegen` output the example consumes
-  integration/
-    permissions.integration.test.ts         — end-to-end test against an executable schema
-vitest.config.ts    — dedupes/inlines graphql so it loads as a single instance under vitest
+packages/
+  graphql-casl/
+    src/
+      index.ts          — public API entry point (re-exports + package overview)
+      schemaTypes.ts    — type helpers derived from generated Resolvers/ResolversTypes
+      rules.ts          — graphql-middleware rule layer (Rule, PermissionsMap, accept, deny)
+      ability.ts        — CASL Action/Actions + the loose AbilityLike shape
+      graphqlAbility.ts — GraphQLAbility, createGraphQLAbility, buildGraphQLAbility
+      subjects.ts       — createSubjects / createTyped
+      createCan.ts      — factory tying a CASL ability to the rule layer
+    test/
+      permissions.test.ts                — unit tests for the rule primitives
+      graphqlAbility.test.ts             — typed ability: conditions, operators, stored-rule rehydration
+      example.test.ts                    — runnable "todos" worked example / reference docs
+      example.codegen.ts                 — trimmed `graphql-codegen` output the example consumes
+      integration/permissions.integration.test.ts — end-to-end test against an executable schema
+  graphql-casl-codegen/
+    src/index.ts        — the codegen plugin (plugin + validate + config)
+    test/plugin.test.ts — plugin output + config tests
+vitest.config.ts (per package) — dedupes/inlines graphql so it loads as a single instance
 ```
 
 ## Key conventions
@@ -48,8 +63,15 @@ vitest.config.ts    — dedupes/inlines graphql so it loads as a single instance
 - The library is **schema-agnostic**: type helpers (`SubjectName`, `SubjectMap`,
   `ArgsOf`, `ParentOf`, `ContextOf`) are derived from the consumer's generated
   `Resolvers` / `ResolversTypes` — never hardcode domain type names in the library
-- Runtime subject detection uses `__typename` via `abilityOptions.detectSubjectType`,
-  so consumers tag plain objects with `createTyped()` rather than CASL's `subject()`
+- Subjects are detected by `__typename`: `createTyped()` tags objects with a required,
+  narrowed `__typename`, which CASL's `TaggedInterface` natively accepts (so no
+  `__caslSubjectType__` is used)
+- `GraphQLAbility<SubjectMap>` is a CASL `MongoAbility` (built via `createMongoAbility`,
+  so conditions use CASL's mongo-query operators `$eq`/`$in`/`$gt`/… and its built-in
+  `mongoQueryMatcher`); `createGraphQLAbility` gives statically-typed `can`/`cannot`
+  conditions via a `__typename`-tagged subject tuple. There is no untyped ability path
+- Rules are plain JSON: persist `builder.rules` / `ability.rules` and rehydrate with
+  `buildGraphQLAbility(rules)` (for DB-backed, cached-at-startup authorization)
 - `createCan` / `createSubjects` / `createTyped` are factories bound to the
   consumer's context shape and ability builder — keep auth/ability logic out of
   the library core
@@ -65,34 +87,42 @@ vitest.config.ts    — dedupes/inlines graphql so it loads as a single instance
 - Keep the summary imperative and under ~72 characters; add a body when the why
   isn't obvious from the diff.
 - One logical change per commit.
-- Commit messages **drive releases** — `feat:` triggers a minor bump, `fix:` a
-  patch, and a `BREAKING CHANGE:` footer a major. `chore:`/`docs:`/`test:`/`ci:`
-  do not publish.
+- Commit messages **drive the (repo-wide) release** — `feat:` triggers a minor
+  bump, `fix:` a patch, and a `BREAKING CHANGE:` footer a major.
+  `chore:`/`docs:`/`test:`/`ci:` do not publish. A scope is optional but useful
+  for clarity (e.g. `feat(codegen): …`); versioning is unified, so any release
+  publishes every package.
 
 ## CI & releases
 
-Two GitHub Actions workflows, mirroring the rest of the `@vantreeseba` libs:
+Two GitHub Actions workflows:
 
-- **`.github/workflows/test.yml`** — runs on every push: `npm ci`, biome check,
-  `npm run typecheck`, `npm test`, `npm run coverage`, `npm run build`.
-- **`.github/workflows/release.yml`** — runs after the **Test** workflow succeeds
-  on `main`, then runs `npx semantic-release`.
+- **`.github/workflows/test.yml`** — runs on every push: biome check, typecheck,
+  test, coverage, build (all via root scripts that fan out to workspaces), then
+  publishes TypeDoc from `packages/graphql-casl/docs/api/` to the wiki on `main`.
+- **`.github/workflows/release.yml`** — runs after **Test** succeeds on `main`,
+  then runs `npx semantic-release` once at the repo root.
 
-Releases are automated by [semantic-release](https://semantic-release.gitbook.io/)
-(`.releaserc.json`): it analyzes commits, updates `CHANGELOG.md` and
-`package.json`, publishes to npm, and creates a GitHub release + tag.
+Releases use a **single, repo-wide version** ([semantic-release](https://semantic-release.gitbook.io/)
+at the root, `.releaserc.json`): one `v${version}` git tag and one GitHub release
+drive the version, and `@semantic-release/exec` bumps and publishes **every**
+workspace together (`npm version … --workspaces`, then `npm publish --workspaces`)
+— even a package with no changes ships at the new shared version. The root
+`package.json` is `private`, so only the public sub-packages publish.
 
-- Requires repo secret **`NPM_ACCESS_TOKEN`** (npm automation token). `GITHUB_TOKEN`
-  is provided by Actions.
-- semantic-release derives the version from git tags, **not** `package.json`. With
-  no tag present its first release is `1.0.0`; to keep the intended `0.x` line,
-  push an initial `v0.1.0` tag before the first release so it bumps from there.
+- Requires repo secret **`NPM_ACCESS_TOKEN`** (or OIDC trusted publishing).
+  `GITHUB_TOKEN` is provided by Actions.
+- The plain `v${version}` tag format continues the existing `v0.x` tag history
+  (no migration/seeding needed). Validate with `npx semantic-release --dry-run`
+  at the root.
 
 ## Running locally
 
 ```bash
 npm install
-npm test        # run vitest
-npm run build   # compile to dist/
-npm run check   # biome lint + format check
+npm test        # vitest across all packages
+npm run build   # compile every package to its dist/
+npm run check   # biome lint + format check (whole repo)
+
+npm run test -w packages/graphql-casl-codegen  # one package
 ```

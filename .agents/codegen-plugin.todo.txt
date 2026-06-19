@@ -1,0 +1,55 @@
+Codegen plugin + monorepo  (DONE)
+=================================
+Decisions (from user): separate package in a monorepo; plugin generates
+"subjects + bindings + ability binding".
+
+What shipped
+------------
+- Converted the repo to an npm-workspaces monorepo:
+    packages/graphql-casl/          — the runtime (moved from repo root, unchanged code)
+    packages/graphql-casl-codegen/  — NEW: the GraphQL Code Generator plugin
+  Root package.json is private, holds shared dev tooling (biome, typescript,
+  vitest, coverage, typedoc, semantic-release*) and delegating scripts
+  (build/test/typecheck/... fan out via `npm run X --workspaces`).
+- Plugin (packages/graphql-casl-codegen/src/index.ts): exports `plugin` + `validate`
+  + `GraphqlCaslPluginConfig`. Runs AFTER typescript + typescript-resolvers in the
+  same output file; emits (via prepend import + content):
+    export type AppSubjectMap = SubjectMap<Resolvers, ResolversTypes>;
+    export const Subject = createSubjects<AppSubjectMap>()({ ...object types } as const);
+    export const typed = createTyped<AppSubjectMap>();
+    export const ability = () => createGraphQLAbility<AppSubjectMap>();
+  Excludes root op types + introspection (__*); sorts names; all names configurable.
+  createCan stays in app code (needs Context + auth fn) — intentionally NOT generated.
+- Tests: packages/graphql-casl-codegen/test/plugin.test.ts (output + config + validate).
+- Docs: root README (monorepo overview), packages/graphql-casl-codegen/README.md,
+  AGENTS.md rewritten for the monorepo.
+- CI: test.yml wiki path -> packages/graphql-casl/docs/api; release.yml matrixes
+  over packages and runs semantic-release per package dir.
+- .gitignore: docs/api ignore made nested-aware (**/docs/api/).
+
+Verified: build, typecheck, typecheck:tests, test (graphql-casl 33 + codegen 3),
+coverage, docs, biome — all green across both workspaces.
+
+RELEASE — unified, repo-wide version (resolves review #10/#11/#15)
+-----------------------------------------------------------------
+- Single semantic-release at the REPO ROOT (.releaserc.json); semantic-release-monorepo
+  and the per-package .releaserc files were removed. One `v${version}` tag + one
+  GitHub release drive the version; @semantic-release/exec bumps and publishes ALL
+  workspaces together: prepareCmd `npm version <v> --workspaces`, publishCmd
+  `npm publish --workspaces`. Root package.json is private, so only the public
+  sub-packages publish. Both sub-packages are aligned at 0.2.1.
+- Plain `v${version}` tag format CONTINUES the existing v0.x history — no tag
+  seeding/migration needed (review #11 resolved). Validated with
+  `npx semantic-release --dry-run` at root: finds the v0.x tag, computes 1.0.0
+  (breaking changes), skips publish in dry-run.
+- STILL needs maintainer confirmation (cannot test a real publish here): npm auth
+  (OIDC trusted publishing / NPM_ACCESS_TOKEN) works for BOTH names, incl.
+  first-publish access for @vantreeseba/graphql-casl-codegen (`npm publish
+  --workspaces` will attempt to publish it for the first time).
+
+Possible follow-ups
+-------------------
+- Generate a typed createCan binding too? (Currently left to app code by design.)
+- PermissionsMap skeleton generation (was offered, not selected).
+- Field-type-aware operators / load-time rule validation — see prisma-schema-typing.todo.txt.
+- accessibleBy row/list filtering — see accessibleby.todo.txt.

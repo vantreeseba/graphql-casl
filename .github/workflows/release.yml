@@ -35,7 +35,15 @@ jobs:
       - name: Build
         run: npm run build
 
+      # One repo-wide version: semantic-release runs at the root, derives the
+      # version from `v*` tags, and (via @semantic-release/exec) bumps and
+      # publishes every workspace together.
       - name: Release
         run: npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # OIDC trusted publishing (id-token: write) is preferred; NODE_AUTH_TOKEN
+          # is a fallback so `npm publish --workspaces` can authenticate — notably
+          # for the first publish of @vantreeseba/graphql-casl-codegen, which has
+          # no trusted-publisher entry yet.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_ACCESS_TOKEN }}

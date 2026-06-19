@@ -1,0 +1,68 @@
+GraphQLAbility — redesign  (DONE)
+=================================
+Replaced the MongoAbility-based ability with a bespoke, schema-typed CASL ability.
+Workstream B (accessibleBy-style row/list filtering) is in accessibleby.todo.txt.
+
+What shipped
+------------
+- src/graphqlAbility.ts:
+    GraphQLAbility<TMap>        — CASL `Ability` (pure base, NOT MongoAbility) with
+                                  our conditions language + __typename detection.
+    GraphQLAbilities<TMap>      — ability-tuple union; objects tagged with a required
+                                  __typename; includes a [Action,'all'] member.
+    createGraphQLAbility<TMap>()— typed AbilityBuilder; build() applies the matcher
+                                  + __typename detection.
+    buildGraphQLAbility(rules)  — rehydrate an ability from stored JSON rules.
+    GraphQLRule<TMap>           — serializable rule type (RawRuleOf).
+    GqlOperators/GqlFieldCondition/GqlConditionsFor/GqlConditions — the conditions language.
+    gqlConditionsMatcher        — equality + eq/ne/in/nin/gt/gte/lt/lte (serializable).
+- src/ability.ts: removed AppAbility + abilityOptions (untyped path GONE); kept
+  Action/Actions; AbilityLike loosened to `can(...args:any[])` so a strictly-typed
+  ability satisfies it. createCan casts to AbilityLike at the internal can() call.
+- src/subjects.ts: createTyped now tags a required, narrowed __typename only
+  (no __caslSubjectType__).
+- Exports updated in src/index.ts.
+- Tests migrated off MongoAbility/abilityOptions; new test/graphqlAbility.test.ts
+  covers conditions, operators, manage/all, deny-by-default, and JSON round-trip
+  rehydration via buildGraphQLAbility.
+- Docs: README (Concepts, Conditions section, sections 1-5 incl. Persisting rules),
+  AGENTS.md (structure + conventions). example.md added (minimal, comment-free).
+
+KEY TECHNICAL FINDINGS
+----------------------
+1. CASL's TaggedInterface (types.d.ts) natively accepts `{ readonly __typename: T }`
+   as a subject tag — alongside __caslSubjectType__ and `kind`. So __typename works
+   for BOTH the AbilityBuilder's string-subject condition narrowing AND check-time
+   can(). The catch: the tag must be REQUIRED. Codegen emits `__typename?:` (optional),
+   which does NOT satisfy TaggedInterface<string> (`__typename: string` required) — that
+   is why bare Partial<Model> tuples don't narrow. createTyped + the Tagged<> helper
+   force a required __typename.
+2. Per-subject condition typing through CASL's AbilityBuilder needs the Conditions
+   generic to be an HKT: GqlConditions = GqlConditionsFor<T> & Container<GqlConditionsFactory>,
+   where GqlConditionsFactory.produce = GqlConditionsFor<this[0]>. Without the Container,
+   ProduceGeneric falls back to the bare type and conditions stop narrowing.
+3. A strictly-typed Ability does NOT satisfy a `can(action:string,subject:unknown)`
+   shape (variadic union overload vs fixed params) — hence AbilityLike was loosened.
+
+InferSubjects — considered, NOT used
+------------------------------------
+CASL's InferSubjects<T> builds `T | TagName<T>` (object-or-name unions) from classes/
+tagged interfaces. We already have a SubjectMap (name -> model) from codegen, so the
+mapped tuple `{ [K]: [Action, Tagged<K,TMap[K]> | K] }[keyof TMap]` is more direct and
+keeps everything derived from the generated types. Revisit only if we ever accept
+class-based subjects instead of a SubjectMap.
+
+Possible follow-ups
+-------------------
+- DONE: createCan is now subject-map-aware. `createCan<Context, TSubjectMap>(...)`;
+  `getSubjectData` returns `Partial<TSubjectMap[K]>` (subject field VALUES, not the
+  operator condition type — conditions live on the ability rules). Call convention
+  changed from `canUser<Args>(...)` to annotating the callback arg:
+  `canUser(action, subject, (args: Args) => ({...}))`, so K (subject) and Args are
+  both inferred. Added BuildSubject<TSubjectMap> export + a compile-time test.
+- Schema-driven condition/input typing — see prisma-schema-typing.todo.txt.
+- NEXT: codegen plugin.
+- Rule validation against the live GraphQLSchema at load time (reject stored rules
+  referencing unknown subjects/fields) — see prisma-schema-typing.todo.txt.
+
+Verified: npm run typecheck, typecheck:tests, test (32 pass), check, build — all green.

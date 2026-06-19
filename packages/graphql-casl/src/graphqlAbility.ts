@@ -67,6 +67,23 @@ export type GraphQLAbilityOptions<TSubjectMap extends Record<string, object>> = 
   AbilityOptionsOf<GraphQLAbility<TSubjectMap>>
 >;
 
+/**
+ * Reads a subject's `__typename`. CASL only calls this for object subjects (bare
+ * string subject names and `undefined` are handled before this runs), so a
+ * missing/`non-string `__typename` means an untagged object reached the check —
+ * fail loud rather than silently denying, since CASL can't classify it.
+ */
+function detectSubjectType(subject: { __typename?: unknown }): string {
+  const typename = subject.__typename;
+  if (typeof typename !== 'string') {
+    throw new Error(
+      'graphql-casl: subject is missing a string `__typename`. Tag it with `typed()` ' +
+        '(from `createTyped`) before checking, or pass the bare subject-name string.',
+    );
+  }
+  return typename;
+}
+
 function gqlAbilityOptions<TSubjectMap extends Record<string, object>>(
   overrides?: GraphQLAbilityOptions<TSubjectMap>,
 ): AbilityOptionsOf<GraphQLAbility<TSubjectMap>> {
@@ -76,7 +93,7 @@ function gqlAbilityOptions<TSubjectMap extends Record<string, object>>(
     Object.entries(overrides ?? {}).filter(([, value]) => value !== undefined),
   );
   return {
-    detectSubjectType: (subject: { __typename: string }) => subject.__typename,
+    detectSubjectType,
     ...defined,
     // Cast bridges our broad `__typename: string` reader to CASL's literal
     // `ExtractSubjectType` return; detection is validated by tests instead.

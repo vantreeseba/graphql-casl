@@ -25,11 +25,13 @@ export const Actions = {
 } as const satisfies Record<Action, Action>;
 
 /**
- * Minimal structural type for anything with a CASL-style `can` method. Kept
- * deliberately loose so any concrete ability (e.g. a typed `GraphQLAbility`,
- * whose `can` is narrowly overloaded) satisfies it.
+ * Minimal structural type for anything with a CASL-style `can` method — what the
+ * rule layer needs to check an action against a subject. A typed
+ * {@link GraphQLAbility} satisfies it; the method shape keeps type-checking for
+ * consumers who annotate their ability with this type, unlike a `(...args: any[])`
+ * shim.
  */
 export type AbilityLike = {
-  // biome-ignore lint/suspicious/noExplicitAny: structural shim for any ability's can()
-  can(...args: any[]): boolean;
+  // biome-ignore lint/suspicious/noExplicitAny: subject is opaque to the rule layer; the action stays type-checked
+  can(action: Action, subject: any): boolean;
 };

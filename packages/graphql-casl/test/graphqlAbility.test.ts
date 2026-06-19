@@ -80,6 +80,15 @@ describe('createGraphQLAbility', () => {
     const ability = build({ detectSubjectType: undefined });
     expect(ability.can('read', typed('Todo', { id: 't1' }))).toBe(true);
   });
+
+  it('throws a clear error when an object subject lacks __typename', () => {
+    const { can, build } = createGraphQLAbility<AppSubjectMap>();
+    can('read', 'Todo');
+    const ability = build();
+    // A raw object that was never tagged via `typed()` can't be classified —
+    // fail loud instead of silently denying.
+    expect(() => ability.can('read', { id: 't1' } as never)).toThrow(/__typename/);
+  });
 });
 
 describe('buildGraphQLAbility (stored rules)', () => {

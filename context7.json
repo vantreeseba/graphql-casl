@@ -1,0 +1,27 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "@vantreeseba/graphql-casl",
+  "description": "A graphql-middleware plugin for schema-agnostic CASL permission rules on GraphQL resolvers, declared per type/field in a PermissionsMap and enforced before each resolver runs.",
+  "folders": [],
+  "excludeFolders": [
+    "dist",
+    "docs",
+    "node_modules",
+    "coverage",
+    ".github"
+  ],
+  "excludeFiles": [
+    "CHANGELOG.md"
+  ],
+  "rules": [
+    "The library is schema-agnostic: subject names and condition types are derived from the consumer's generated Resolvers / ResolversTypes. Never hardcode domain type names in the library core.",
+    "All public exports come from src/index.ts: runtime helpers (createCan, createTyped, createSubjects, accept, deny, applyPermissions, Actions, abilityOptions) plus type helpers (PermissionsMap, Rule, SubjectName, SubjectMap, ArgsOf, etc.).",
+    "Runtime subject detection uses __typename via abilityOptions.detectSubjectType. Consumers tag plain objects with createTyped() rather than CASL's subject(). Always pass abilityOptions when building an ability with createMongoAbility.",
+    "createCan(getAbility, isAuthenticated, buildSubject?) returns a requireCan(action, subject, getSubjectData?) rule builder bound to the consumer's context and ability builder; getSubjectData reads condition values from resolver args.",
+    "accept is the always-pass primitive; deny is the always-fail primitive. A failed authentication check throws 'Not authenticated'; a failed ability check throws 'Forbidden'.",
+    "applyPermissions(schema, permissions) wraps graphql-middleware's applyMiddleware and keeps permissions typed as PermissionsMap<Resolvers> so mistyped type or field names are caught at compile time.",
+    "Stack: TypeScript 5 strict, ESM only, Vitest for tests, Biome for lint/format. No runtime dependencies — @casl/ability >=6, graphql >=16, and graphql-middleware >=6 are peer deps.",
+    "Use Conventional Commits; commits drive automated semantic-release publishing (feat = minor, fix = patch, BREAKING CHANGE = major)."
+  ],
+  "previousVersions": []
+}

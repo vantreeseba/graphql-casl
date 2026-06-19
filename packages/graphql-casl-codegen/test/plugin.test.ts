@@ -36,6 +36,32 @@ describe('graphql-casl codegen plugin', () => {
     );
   });
 
+  it('includes interface and union subjects (matching SubjectMap) but not scalars/enums/inputs', async () => {
+    // typescript-resolvers emits Resolvers entries for interfaces & unions, so
+    // SubjectMap includes them — the Subject const must too, or it won't compile.
+    const withComposites = buildSchema(`
+      scalar DateTime
+      enum Role { ADMIN USER }
+      input NoteFilter { q: String }
+      interface Node { id: ID! }
+      type User implements Node { id: ID!, role: Role }
+      type Note implements Node { id: ID! }
+      union SearchResult = User | Note
+      type Query { node(id: ID!): Node, search(f: NoteFilter): [SearchResult!]! }
+    `);
+    const out = (await plugin(withComposites, [], {})) as Types.ComplexPluginOutput;
+    const content = out.content ?? '';
+
+    expect(content).toMatch(/Node: 'Node',/); // interface
+    expect(content).toMatch(/SearchResult: 'SearchResult',/); // union
+    expect(content).toMatch(/User: 'User',/);
+    expect(content).toMatch(/Note: 'Note',/);
+    // scalars, enums, and input types are not subjects
+    expect(content).not.toMatch(/DateTime:/);
+    expect(content).not.toMatch(/Role:/);
+    expect(content).not.toMatch(/NoteFilter:/);
+  });
+
   it('honors config overrides', async () => {
     const { prepend, content } = await run({
       importPath: '#auth',

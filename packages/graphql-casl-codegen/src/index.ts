@@ -14,7 +14,7 @@
  */
 
 import type { PluginFunction, PluginValidateFn } from '@graphql-codegen/plugin-helpers';
-import { type GraphQLSchema, isObjectType } from 'graphql';
+import { type GraphQLSchema, isInterfaceType, isObjectType, isUnionType } from 'graphql';
 
 /** Configuration for the {@link plugin}. Every field has a sensible default. */
 export interface GraphqlCaslPluginConfig {
@@ -45,9 +45,15 @@ const DEFAULTS = {
 } satisfies Required<GraphqlCaslPluginConfig>;
 
 /**
- * The schema's domain subject names: object types excluding the root operation
- * types (Query/Mutation/Subscription) and introspection types (`__*`), sorted for
- * deterministic output.
+ * The schema's domain subject names: object, interface, and union types,
+ * excluding the root operation types (Query/Mutation/Subscription) and
+ * introspection types (`__*`), sorted for deterministic output.
+ *
+ * This mirrors the runtime `SubjectName<Resolvers>` derivation (every `Resolvers`
+ * key that is not a root operation or a scalar) — `typescript-resolvers` emits
+ * resolver entries for interfaces and unions too (via `__resolveType`), so
+ * `SubjectMap` includes them and the generated `Subject` const must as well, or
+ * `createSubjects`'s all-keys constraint would fail to compile.
  */
 function subjectNames(schema: GraphQLSchema): string[] {
   const roots = new Set(
@@ -57,7 +63,11 @@ function subjectNames(schema: GraphQLSchema): string[] {
   );
   const typeMap = schema.getTypeMap();
   return Object.keys(typeMap)
-    .filter((name) => !name.startsWith('__') && !roots.has(name) && isObjectType(typeMap[name]))
+    .filter((name) => {
+      if (name.startsWith('__') || roots.has(name)) return false;
+      const type = typeMap[name];
+      return isObjectType(type) || isInterfaceType(type) || isUnionType(type);
+    })
     .sort();
 }
 

@@ -41,7 +41,7 @@ packages/
       schemaTypes.ts    — type helpers derived from generated Resolvers/ResolversTypes
       rules.ts          — graphql-middleware rule layer (Rule, PermissionsMap, accept, deny)
       ability.ts        — CASL Action/Actions + the loose AbilityLike shape
-      graphqlAbility.ts — GraphQLAbility, createGraphQLAbility, buildGraphQLAbility, gqlConditionsMatcher
+      graphqlAbility.ts — GraphQLAbility, createGraphQLAbility, buildGraphQLAbility
       subjects.ts       — createSubjects / createTyped
       createCan.ts      — factory tying a CASL ability to the rule layer
     test/
@@ -65,10 +65,10 @@ vitest.config.ts (per package) — dedupes/inlines graphql so it loads as a sing
 - Subjects are detected by `__typename`: `createTyped()` tags objects with a required,
   narrowed `__typename`, which CASL's `TaggedInterface` natively accepts (so no
   `__caslSubjectType__` is used)
-- `GraphQLAbility<SubjectMap>` is built on CASL's pure `Ability` base (not `MongoAbility`)
-  with `gqlConditionsMatcher` (equality + `eq/ne/in/nin/gt/gte/lt/lte`, all serializable);
-  `createGraphQLAbility` gives statically-typed `can`/`cannot` conditions via a `__typename`-tagged
-  subject tuple + a CASL HKT on the conditions type. There is no untyped ability path
+- `GraphQLAbility<SubjectMap>` is a CASL `MongoAbility` (built via `createMongoAbility`,
+  so conditions use CASL's mongo-query operators `$eq`/`$in`/`$gt`/… and its built-in
+  `mongoQueryMatcher`); `createGraphQLAbility` gives statically-typed `can`/`cannot`
+  conditions via a `__typename`-tagged subject tuple. There is no untyped ability path
 - Rules are plain JSON: persist `builder.rules` / `ability.rules` and rehydrate with
   `buildGraphQLAbility(rules)` (for DB-backed, cached-at-startup authorization)
 - `createCan` / `createSubjects` / `createTyped` are factories bound to the

@@ -49,6 +49,8 @@ export function createTyped<TMap extends Record<string, object>>() {
     type: K,
     attrs: Partial<TMap[K]>,
   ): TMap[K] & { __typename: K } {
-    return { __typename: type, ...attrs } as unknown as TMap[K] & { __typename: K };
+    // Spread attrs first so the `__typename` tag always wins — an attrs object
+    // that carries its own `__typename` must not be able to mis-tag the subject.
+    return { ...attrs, __typename: type } as unknown as TMap[K] & { __typename: K };
   };
 }

@@ -97,7 +97,9 @@ const resolvers = {
   },
   Mutation: {
     updateNote: (_: unknown, args: { id: string; userId: string; body: string }) => {
-      const note = NOTES.find((n) => n.id === args.id);
+      // Scope by the authorized `userId` too (the rule checked it pre-resolution),
+      // so a forged userId that passes the gate can't reach another user's note.
+      const note = NOTES.find((n) => n.id === args.id && n.userId === args.userId);
       if (!note) return null;
       note.body = args.body;
       return note;

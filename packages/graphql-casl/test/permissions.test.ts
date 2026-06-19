@@ -118,6 +118,12 @@ describe('createTyped', () => {
   it('tags attrs with __typename', () => {
     expect(typed('Note', { id: '1' })).toEqual({ __typename: 'Note', id: '1' });
   });
+
+  it('the __typename tag wins over a conflicting attrs.__typename', () => {
+    // A caller (via JS/cast) cannot mis-tag the subject through attrs.
+    const tagged = typed('Note', { __typename: 'Org', id: '1' } as never);
+    expect(tagged.__typename).toBe('Note');
+  });
 });
 
 describe('createSubjects', () => {

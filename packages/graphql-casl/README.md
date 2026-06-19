@@ -21,37 +21,36 @@ npm install @casl/ability graphql graphql-middleware
 
 | Export | What it does |
 |---|---|
-| `createGraphQLAbility<SubjectMap>()` | Returns a CASL `AbilityBuilder` typed against your schema — `can`/`cannot` conditions are checked against each subject's fields — with the GraphQL conditions matcher and `__typename` detection applied by `build()`. |
+| `createGraphQLAbility<SubjectMap>()` | Returns a CASL `AbilityBuilder` typed against your schema — `can`/`cannot` conditions are checked against each subject's fields — with `__typename` detection applied by `build()`. |
 | `buildGraphQLAbility<SubjectMap>(rules, options?)` | Rebuilds an ability from stored `GraphQLRule`s (e.g. rules persisted in a database and loaded at startup). |
 | `createCan(getAbility, isAuthenticated, buildSubject?)` | Factory that returns a `requireCan(action, subject, getSubjectData?)` rule builder, bound to your context shape and ability builder. |
 | `createTyped<SubjectMap>()` | Returns a `typed(type, attrs)` helper that tags plain objects with `__typename` for subject detection. |
 | `createSubjects<SubjectMap>()` | Validates a subject-name const object against your schema's domain types. |
-| `gqlConditionsMatcher` | The GraphQL conditions matcher (equality + a small operator set), for manual ability construction. |
 | `accept` / `deny` | Always-pass / always-fail rule primitives. |
 | `Actions` | Const map of `create` / `read` / `update` / `delete` / `manage`. |
 
 Type helpers: `PermissionsMap`, `Rule`, `SubjectName`, `SubjectMap`, `ArgsOf`,
 `ParentOf`, `ContextOf`, `Action`, `GraphQLAbility`, `GraphQLAbilities`,
-`GraphQLRule`, `GraphQLAbilityOptions`, `GqlConditions`, `GqlConditionsFor`,
-`GqlFieldCondition`, `GqlOperators`, `AbilityLike`.
+`GraphQLRule`, `GraphQLAbilityOptions`, `AbilityLike`.
 
 A failed authentication check throws `Not authenticated`; a failed ability check
 throws `Forbidden`.
 
 ### Conditions
 
-Conditions are a small, **serializable** language (no mongo-query operators). A
-field maps to either a bare value (equality) or an operator object:
+`GraphQLAbility` is a CASL [`MongoAbility`](https://casl.js.org/v6/en/guide/conditions-in-depth),
+so conditions use the standard CASL mongo-query operators. A field maps to either
+a bare value (equality) or an operator object:
 
 ```ts
-can('read', 'Note', { userId });                       // equality
-can('read', 'Note', { status: { in: ['draft', 'live'] } });
-can('read', 'Note', { version: { gt: 2 }, title: { ne: '' } });
+can('read', 'Note', { userId });                          // equality
+can('read', 'Note', { status: { $in: ['draft', 'live'] } });
+can('read', 'Note', { version: { $gt: 2 }, title: { $ne: '' } });
 ```
 
-Operators: `eq`, `ne`, `in`, `nin`, `gt`, `gte`, `lt`, `lte`. Because rules are
-plain JSON, you can store them in a database and rehydrate with
-`buildGraphQLAbility` (see [Persisting rules](#5-persisting-rules-optional)).
+Operators are CASL's mongo set (`$eq`, `$ne`, `$in`, `$nin`, `$gt`, `$gte`,
+`$lt`, `$lte`, …). Conditions are plain JSON, so you can store rules in a database
+and rehydrate with `buildGraphQLAbility` (see [Persisting rules](#5-persisting-rules-optional)).
 
 ## Usage
 
@@ -60,8 +59,7 @@ plain JSON, you can store them in a database and rehydrate with
 Bind the generic helpers to your app's generated types and define abilities with
 `createGraphQLAbility`. It returns a CASL `AbilityBuilder` typed against your
 `SubjectMap`, so `can`/`cannot` conditions are checked against each subject's
-fields, and `build()` wires the GraphQL conditions matcher and `__typename`
-subject detection for you.
+fields, and `build()` wires `__typename` subject detection for you.
 
 ```ts
 import {
@@ -131,6 +129,16 @@ export const permissions: PermissionsMap<Resolvers> = {
   },
 };
 ```
+
+> ⚠️ **Checks run before the resolver.** `graphql-middleware` invokes a rule
+> *before* the field resolver, so `getSubjectData` only sees `args`/`context` —
+> never the to-be-loaded entity. A condition built from a client-supplied arg
+> (`args.userId`) therefore validates what the **client asserted**, not the real
+> record. If the resolver then targets a *different* arg (e.g. `args.id`), a
+> caller can pass their own `userId` (to pass the check) but someone else's `id`
+> — an IDOR. Make the resolver **scope by the same field the rule authorized**
+> (look up by `id` **and** `userId`), derive the owner from `context` rather than
+> args, or enforce ownership in your data layer.
 
 ### 4. Apply to the schema
 

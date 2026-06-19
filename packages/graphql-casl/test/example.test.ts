@@ -125,7 +125,12 @@ const resolvers: Resolvers<Context> = {
       return todo;
     },
     setDone: (_parent, args) => {
-      const todo = TODOS.find((t) => t.id === args.id);
+      // The rule authorized `ownerId` (from args, before this resolver ran), so
+      // the resolver MUST scope the write to that same `ownerId`. Looking up by
+      // `id` alone would be an IDOR: a caller could pass their own `ownerId` (to
+      // pass the check) but someone else's `id`. Middleware can't see the
+      // to-be-loaded row, so the resolver enforces the row↔owner link.
+      const todo = TODOS.find((t) => t.id === args.id && t.ownerId === args.ownerId);
       if (!todo) return null;
       todo.done = args.done;
       return todo;
@@ -227,6 +232,19 @@ describe('todos example', () => {
     expect(result.data?.setDone).toBeNull();
     expect(result.errors?.[0]?.message).toBe('Forbidden');
     expect(TODOS.find((t) => t.id === 't2')?.done).toBe(false); // resolver never ran
+  });
+
+  it('does not let a forged ownerId reach someone else’s todo (IDOR)', async () => {
+    // Attack: pass your own ownerId (so the check passes) but a victim's id.
+    const ctx = { userId: 'alice' };
+    const variables = { id: 't2', ownerId: 'alice', done: true }; // t2 is bob's
+
+    const result = await run(SET_DONE, ctx, variables);
+    // The gate passes (alice may update her own todos), but the resolver scopes
+    // the write by ownerId, so bob's todo is never found or touched.
+    expect(result.errors).toBeUndefined();
+    expect(result.data?.setDone).toBeNull();
+    expect(TODOS.find((t) => t.id === 't2')?.done).toBe(false);
   });
 
   it('always denies a field guarded by deny', async () => {

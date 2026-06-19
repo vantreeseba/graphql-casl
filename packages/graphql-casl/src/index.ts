@@ -9,9 +9,8 @@
  *
  * Abilities are statically typed: derive a {@link GraphQLAbility} from your
  * `SubjectMap` and build it with {@link createGraphQLAbility} (or rehydrate
- * stored rules with {@link buildGraphQLAbility}). Conditions use a small,
- * serializable operator language ({@link GqlOperators}) matched by
- * {@link gqlConditionsMatcher}; subjects are detected via `__typename`.
+ * stored rules with {@link buildGraphQLAbility}). Conditions use CASL's standard
+ * mongo-query operators (`$eq`/`$in`/`$gt`/…); subjects are detected via `__typename`.
  *
  * Modules:
  * - `schemaTypes` — type helpers derived from generated `Resolvers`/`ResolversTypes`
@@ -29,20 +28,12 @@ export { Actions } from './ability.js';
 export type { BuildSubject, RequireCan, RequireCanBare } from './createCan.js';
 export { createCan } from './createCan.js';
 export type {
-  GqlConditions,
-  GqlConditionsFor,
-  GqlFieldCondition,
-  GqlOperators,
   GraphQLAbilities,
   GraphQLAbility,
   GraphQLAbilityOptions,
   GraphQLRule,
 } from './graphqlAbility.js';
-export {
-  buildGraphQLAbility,
-  createGraphQLAbility,
-  gqlConditionsMatcher,
-} from './graphqlAbility.js';
+export { buildGraphQLAbility, createGraphQLAbility } from './graphqlAbility.js';
 export type { PermissionsMap, Rule } from './rules.js';
 export { accept, applyPermissions, deny } from './rules.js';
 export type { ArgsOf, ContextOf, ParentOf, SubjectMap, SubjectName } from './schemaTypes.js';
